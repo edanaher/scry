@@ -122,8 +122,8 @@ def generate_sql(foreign_keys, tree, schema=None, lastTable=None, path=None):
         return (selects, joins)
 
     for c, subTree in tree.items():
-        if c == '*':
-            selects.append(schema + "." + lastTable + ".*")
+        if subTree == None:
+            selects.append(schema + "." + lastTable + "." + c)
         else:
             t1 = schema + "." + lastTable
             t2 = schema + "." + c
