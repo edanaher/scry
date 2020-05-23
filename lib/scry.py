@@ -7,6 +7,27 @@ import sys
 
 DEFAULT_SCHEMA="scry"
 
+def get_table_info(cur):
+    schemas = set()
+    tables = set()
+    columns = set()
+    query = """SELECT
+        table_schema,
+        table_name,
+        column_name
+    FROM information_schema.columns
+    WHERE table_schema='scry'"""
+
+    cur.execute(query)
+
+    for row in cur:
+        s, t, c = row
+        schemas.add(s)
+        tables.add(t)
+        columns.add(c)
+    return (list(schemas), list(tables), list(columns))
+
+
 def get_foreign_keys(cur):
     query = """SELECT
         tc.table_schema,
@@ -58,14 +79,18 @@ def addToTree(tree, path, hasSchema = False):
         tree[node.value] = None
 
 
-def parse(query):
-    p = Lark("""
+def parse(table_info, query):
+    def choices(cs):
+        return "|".join(sorted([f'"{c}"' for c in cs],key=len,reverse=True))
+
+    schemas, tables, columns = table_info
+    p = Lark(f"""
         start: component (" " component)*
         component: query_path
         query_path: (SCHEMA ".")? TABLE ("." TABLE)* ("." FIELD)?
-        SCHEMA: NAME
-        TABLE: NAME
-        FIELD: NAME | "*"
+        SCHEMA: {choices(schemas)}
+        TABLE: {choices(tables)}
+        FIELD: {choices(columns)} | "*"
 
         %import common.CNAME -> NAME
     """)
@@ -120,9 +145,10 @@ def main():
     db = psycopg2.connect("")
     cur = db.cursor()
 
+    table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
     query = sys.argv[1]
-    tree = parse(query)
+    tree = parse(table_info, query)
     print(tree)
 
     sql_clauses = generate_sql(foreign_keys, tree)
