@@ -3,6 +3,7 @@
 from collections import defaultdict
 import psycopg2
 from lark import Lark
+import lark
 import sys
 
 DEFAULT_SCHEMA="scry"
@@ -63,6 +64,15 @@ def addToTree(tree, path, hasSchema = False):
 
     node = path[0]
 
+    if isinstance(node, lark.Tree):
+        for c in node.children:
+            addToTree(tree, c, hasSchema)
+        return
+
+    if isinstance(path, str):
+        tree[path] = None
+        return
+
     # If there's no schema, use the default.
     if not hasSchema and node.type != "SCHEMA":
         if DEFAULT_SCHEMA not in tree:
@@ -87,12 +97,15 @@ def parse(table_info, query):
     p = Lark(f"""
         start: component (" " component)*
         component: query_path
-        query_path: (SCHEMA ".")? TABLE ("." TABLE)* ("." COLUMN)?
+        query_path: (SCHEMA ".")? TABLE ("." TABLE)* ("." columns)?
         SCHEMA: {choices(schemas)}
         TABLE: {choices(tables)}
+        columns: COLUMN ("," COLUMN)*
         COLUMN: {choices(columns)} | "*"
 
         %import common.CNAME -> NAME
+        %import common.WS
+        %ignore WS
     """)
     parsed = p.parse(query)
 
@@ -149,7 +162,6 @@ def main():
     foreign_keys = get_foreign_keys(cur)
     query = sys.argv[1]
     tree = parse(table_info, query)
-    print(tree)
 
     sql_clauses = generate_sql(foreign_keys, tree)
     sql = serialize_sql(sql_clauses)
