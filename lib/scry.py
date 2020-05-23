@@ -75,7 +75,7 @@ def addToTree(tree, path, hasSchema = False):
         subTree = tree[node.value]
         addToTree(subTree, path[1:], True)
 
-    if node.type == "FIELD":
+    if node.type == "COLUMN":
         tree[node.value] = None
 
 
@@ -87,10 +87,10 @@ def parse(table_info, query):
     p = Lark(f"""
         start: component (" " component)*
         component: query_path
-        query_path: (SCHEMA ".")? TABLE ("." TABLE)* ("." FIELD)?
+        query_path: (SCHEMA ".")? TABLE ("." TABLE)* ("." COLUMN)?
         SCHEMA: {choices(schemas)}
         TABLE: {choices(tables)}
-        FIELD: {choices(columns)} | "*"
+        COLUMN: {choices(columns)} | "*"
 
         %import common.CNAME -> NAME
     """)
