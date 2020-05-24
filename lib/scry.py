@@ -125,8 +125,12 @@ class buildTree(lark.Visitor):
             column = columns[0]
             suffix_tables = []
 
-        op = "="
-        value = tree.children[1].value[1:-1]
+        op = tree.children[1].children[0].value
+        print("op is ", op)
+        value = tree.children[2].value
+        if value[0] == '"' and value[-1] == '"':
+            value = f"'{value[1:-1]}'"
+        print("value is ", repr(value))
 
         def findPrefix(tree, prefix):
             if prefix == []:
@@ -168,10 +172,11 @@ def parse(table_info, query):
 
         query_path: (schema ".")? table ("." table)* ("." columns)?
 
-        condition: (condition_path | query_path) "=" VALUE
+        condition: (condition_path | query_path) comparison_op VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
         condition_path_prefix: (schema ".")? table ("." table)*
         condition_path_suffix: (table ".")* column
+        !comparison_op: "=" | "<" | "<=" | ">=" | ">"
 
         schema: SCHEMA
         table: TABLE
@@ -180,10 +185,11 @@ def parse(table_info, query):
         TABLE: {choices(tables)}
         columns: COLUMN ("," COLUMN)*
         COLUMN: {choices(columns)} | "*"
-        VALUE: ESCAPED_STRING
+        VALUE: ESCAPED_STRING | SIGNED_NUMBER
 
         %import common.CNAME -> NAME
         %import common.ESCAPED_STRING
+        %import common.SIGNED_NUMBER
         %import common.WS
         %ignore WS
     """)
@@ -211,7 +217,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
                 wheres += w
             for c in tree.get("conditions", []):
                 col, op, value = c
-                wheres.append(f"{schema}.{lastTable}.{col} {op} '{value}'")
+                wheres.append(f"{schema}.{lastTable}.{col} {op} {value}")
             return (joins, wheres)
 
         joins, wheres = subcondition_sql(tree, baseTable)
@@ -245,7 +251,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     if "conditions" in tree:
         for c in tree["conditions"].get("conditions", []):
             col, op, value = c
-            wheres.append(f"{schema}.{table}.{col} {op} '{value}'")
+            wheres.append(f"{schema}.{table}.{col} {op} {value}")
         if "children" in tree["conditions"]:
             wheres.append(generate_condition_subquery(table, tree["conditions"]))
 
