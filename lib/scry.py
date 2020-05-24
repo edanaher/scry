@@ -62,7 +62,7 @@ class buildTree(lark.Visitor):
     def __init__(self):
         self.trees = {}
 
-    def query_path(self, tree):
+    def _split_path(self, tree):
         if tree.children[0].data == "schema":
             schema = tree.children[0].children[0].value
             children = tree.children[1:]
@@ -73,10 +73,19 @@ class buildTree(lark.Visitor):
         if children[-1].data == "columns":
             columns = [c.value for c in children[-1].children]
             children = children[:-1]
+        elif children[-1].data == "column":
+            columns = children[-1].children[0].value
+            children = children[:-1]
         else:
             columns = ["*"]
 
         tables = [c.children[0].value for c in children]
+
+        return (schema, tables, columns)
+
+
+    def query_path(self, tree):
+        schema, tables, columns = self._split_path(tree)
 
         def updateTree(tree, tables, columns):
             if tables == []:
@@ -97,6 +106,63 @@ class buildTree(lark.Visitor):
             self.trees[schema] = {}
         updateTree(self.trees[schema], tables, columns)
 
+    def condition(self, tree):
+        prefix, suffix = tree.children[0].children
+        schema, prefix_tables, _ = self._split_path(prefix)
+        _, suffix_tables, column = self._split_path(suffix)
+
+        op = "eq"
+        value = tree.children[1].value
+
+        def findPrefix(tree, prefix):
+            if prefix == []:
+                return tree
+            (t, *rprefix) = prefix
+            if "children" not in tree:
+                tree["children"] = {}
+            if t not in tree["children"]:
+                tree["children"][t] = {}
+            return findPrefix(tree["children"][t], rprefix)
+
+        def addConstraint(tree, suffix):
+            if suffix == []:
+                if "conditions" not in tree:
+                    tree["conditions"] = []
+                tree["conditions"].append((column, op, value))
+                return
+            s, *rsuffix = suffix
+            if "children" not in prefixNode:
+                prefixNode["children"] = {}
+            if s not in prefixNode["children"]:
+                prefixNode["children"][s] = {}
+            addConstraint(tree["children"][s], rsuffix)
+
+
+        prefixNode = findPrefix(self.trees[schema], prefix_tables)
+
+        if suffix_tables == []:
+            if "conditions" not in prefixNode:
+                prefixNode["conditions"] = {}
+            if "conditions" not in prefixNode["conditions"]:
+                prefixNode["conditions"]["conditions"] = []
+            prefixNode["conditions"]["conditions"].append((column, op, value))
+        else:
+            t, *ts = suffix_tables
+            if "conditions" not in prefixNode:
+                prefixNode["conditions"] = {}
+            if "children" not in prefixNode["conditions"]:
+                prefixNode["conditions"]["children"] = {}
+            if t not in prefixNode["conditions"]["children"]:
+                prefixNode["conditions"]["children"][t] = {}
+
+            addConstraint(prefixNode["conditions"]["children"][t], ts)
+
+        print(prefix.pretty())
+        print(suffix.pretty())
+        print(op)
+        print(value)
+
+
 
 def parse(table_info, query):
     def choices(cs):
@@ -109,7 +175,7 @@ def parse(table_info, query):
 
         query_path: (schema ".")? table ("." table)* ("." columns)?
 
-        condition: condition_path "=" /[a-z0-9A-Z]+/
+        condition: condition_path "=" VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
         condition_path_prefix: (schema ".")? table ("." table)*
         condition_path_suffix: (table ".")* column
@@ -121,6 +187,7 @@ def parse(table_info, query):
         TABLE: {choices(tables)}
         columns: COLUMN ("," COLUMN)*
         COLUMN: {choices(columns)} | "*"
+        VALUE: /[a-z0-9A-Z]+/
 
         %import common.CNAME -> NAME
         %import common.WS
@@ -186,6 +253,7 @@ def main():
     foreign_keys = get_foreign_keys(cur)
     query = sys.argv[1]
     tree = parse(table_info, query)
+    print(tree)
 
     sql_clauses = generate_sql(foreign_keys, tree)
     sql = serialize_sql(sql_clauses)
