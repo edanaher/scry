@@ -105,10 +105,18 @@ def parse(table_info, query):
     schemas, tables, columns = table_info
     p = Lark(f"""
         start: component (" " component)*
-        component: query_path
+        component: query_path | condition
+
         query_path: (schema ".")? table ("." table)* ("." columns)?
+
+        condition: condition_path "=" /[a-z0-9A-Z]+/
+        condition_path: condition_path_prefix ":" condition_path_suffix
+        condition_path_prefix: (schema ".")? table ("." table)*
+        condition_path_suffix: (table ".")* column
+
         schema: SCHEMA
         table: TABLE
+        column: COLUMN
         SCHEMA: {choices(schemas)}
         TABLE: {choices(tables)}
         columns: COLUMN ("," COLUMN)*
