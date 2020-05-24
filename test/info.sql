@@ -46,8 +46,11 @@ INSERT INTO books (id, title, year, author_id) VALUES
   (2, 'The Two Towers', 1953, 1),
   (3, 'Return of the King', 1956, 1),
   (4, 'Harry Potter and the Philosopher''s Stone', 1994, 2),
+
   (5, 'Harry Potter and the Prisoner of Azkaban', 1996, 2),
-  (6, 'Exhalation', 2017, 3);
+  (6, 'Exhalation', 2017, 3),
+
+  (7, 'Beowolf', 2016, 1);
 
 
 INSERT INTO series (id, name) VALUES

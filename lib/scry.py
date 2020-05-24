@@ -116,8 +116,6 @@ class buildTree(lark.Visitor):
             column = columns[0]
             suffix_tables = []
 
-        print("Stuff:", prefix_tables, suffix_tables, column)
-
         op = "="
         value = tree.children[1].value[1:-1]
 
@@ -145,6 +143,8 @@ class buildTree(lark.Visitor):
             addConstraint(tree["children"][s], rsuffix)
 
 
+        if schema not in self.trees:
+            self.trees[schema] = {}
         prefixNode = findPrefix(self.trees[schema], prefix_tables)
 
         if suffix_tables == []:
@@ -229,7 +229,6 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
 
     if "conditions" in tree:
         for c in tree["conditions"].get("conditions", []):
-            print("Unpacking", repr(c))
             col, op, value = c
             wheres.append(f"{schema}.{table}.{col} {op} '{value}'")
         if "children" in tree["conditions"]:
