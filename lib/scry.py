@@ -107,9 +107,16 @@ class buildTree(lark.Visitor):
         updateTree(self.trees[schema], tables, columns)
 
     def condition(self, tree):
-        prefix, suffix = tree.children[0].children
-        schema, prefix_tables, _ = self._split_path(prefix)
-        _, suffix_tables, column = self._split_path(suffix)
+        if tree.children[0].data == "condition_path":
+            prefix, suffix = tree.children[0].children
+            schema, prefix_tables, _ = self._split_path(prefix)
+            _, suffix_tables, column = self._split_path(suffix)
+        else: # query_path
+            schema, prefix_tables, columns = self._split_path(tree.children[0])
+            column = columns[0]
+            suffix_tables = []
+
+        print("Stuff:", prefix_tables, suffix_tables, column)
 
         op = "="
         value = tree.children[1].value[1:-1]
@@ -157,12 +164,6 @@ class buildTree(lark.Visitor):
 
             addConstraint(prefixNode["conditions"]["children"][t], ts)
 
-        print(prefix.pretty())
-        print(suffix.pretty())
-        print(op)
-        print(value)
-
-
 
 def parse(table_info, query):
     def choices(cs):
@@ -175,7 +176,7 @@ def parse(table_info, query):
 
         query_path: (schema ".")? table ("." table)* ("." columns)?
 
-        condition: condition_path "=" VALUE
+        condition: (condition_path | query_path) "=" VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
         condition_path_prefix: (schema ".")? table ("." table)*
         condition_path_suffix: (table ".")* column
