@@ -126,11 +126,9 @@ class buildTree(lark.Visitor):
             suffix_tables = []
 
         op = tree.children[1].children[0].value
-        print("op is ", op)
         value = tree.children[2].value
         if value[0] == '"' and value[-1] == '"':
             value = f"'{value[1:-1]}'"
-        print("value is ", repr(value))
 
         def findPrefix(tree, prefix):
             if prefix == []:
