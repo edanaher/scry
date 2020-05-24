@@ -136,10 +136,10 @@ class buildTree(lark.Visitor):
                 tree["conditions"].append((column, op, value))
                 return
             s, *rsuffix = suffix
-            if "children" not in prefixNode:
-                prefixNode["children"] = {}
-            if s not in prefixNode["children"]:
-                prefixNode["children"][s] = {}
+            if "children" not in tree:
+                tree["children"] = {}
+            if s not in tree["children"]:
+                tree["children"][s] = {}
             addConstraint(tree["children"][s], rsuffix)
 
 
@@ -202,8 +202,28 @@ def parse(table_info, query):
 
 
 def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
-    def generate_condition_sql(tree):
-        raise Exception("Prefix conditions unimplemented")
+    def generate_condition_subquery(baseTable, tree):
+        def subcondition_sql(tree, lastTable):
+            joins = []
+            wheres = []
+            for t, subTree in tree.get("children", {}).items():
+                t1 = schema + "." + lastTable
+                t2 = schema + "." + t
+                k1, k2 = foreign_keys[t1][t2]
+                joins.append(f"JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
+                j, w = subcondition_sql(subTree, t)
+                joins += j
+                wheres += w
+            for c in tree.get("conditions", []):
+                col, op, value = c
+                wheres.append(f"{schema}.{lastTable}.{col} {op} '{value}'")
+            return (joins, wheres)
+
+        joins, wheres = subcondition_sql(tree, baseTable)
+        joins_string = schema + "." + table + " " + " ".join(joins)
+        wheres_string = " AND ".join(wheres)
+        sql = f"{schema}.{table}.id IN (SELECT {schema}.{table}.id FROM {joins_string} WHERE {wheres_string})"
+        return sql
 
     selects = []
     joins = []
@@ -232,7 +252,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
             col, op, value = c
             wheres.append(f"{schema}.{table}.{col} {op} '{value}'")
         if "children" in tree["conditions"]:
-            generate_condition_sql(tree["conditions"])
+            wheres.append(generate_condition_subquery(table, tree["conditions"]))
 
     if not lastTable:
         joins.append(schema + "." + table)
@@ -274,7 +294,6 @@ def main():
     foreign_keys = get_foreign_keys(cur)
     query = sys.argv[1]
     tree = parse(table_info, query)
-    print(tree)
 
     sql_clauses = generate_sql(foreign_keys, tree)
     sql = serialize_sql(sql_clauses)
