@@ -57,6 +57,20 @@ def get_foreign_keys(cur):
         keys[st2][st1] = (c2, c1)
     return keys
 
+# ensure_exists(dict, key1, key2, ..., keyn, default)
+# Ensures that dict[key1][key2]...[keyn] exists; sets to default if not, and
+# creates intermediate dictionares as necessary.
+def ensure_exists(dict, *args):
+    if len(args) == 2:
+        key, default = args
+        if key not in dict:
+            dict[key] = default
+    else:
+        key, *rargs = args
+        if key not in dict:
+            dict[key] = {}
+        ensure_exists(dict[key], *rargs)
+
 
 class buildTree(lark.Visitor):
     def __init__(self):
@@ -89,21 +103,16 @@ class buildTree(lark.Visitor):
 
         def updateTree(tree, tables, columns):
             if tables == []:
-                if "columns" not in tree:
-                    tree["columns"] = []
+                ensure_exists(tree, "columns", [])
                 tree["columns"] += columns
                 return
 
             table, *rtables = tables
-            if "children" not in tree:
-                tree["children"] = {}
-            if table not in tree["children"]:
-                tree["children"][table] = {}
+            ensure_exists(tree, "children", table, {})
 
             updateTree(tree["children"][table], rtables, columns)
 
-        if schema not in self.trees:
-            self.trees[schema] = {}
+        ensure_exists(self.trees, schema, {})
         updateTree(self.trees[schema], tables, columns)
 
     def condition(self, tree):
@@ -123,45 +132,28 @@ class buildTree(lark.Visitor):
             if prefix == []:
                 return tree
             (t, *rprefix) = prefix
-            if "children" not in tree:
-                tree["children"] = {}
-            if t not in tree["children"]:
-                tree["children"][t] = {}
+            ensure_exists(self.trees, schema, "children", t, {})
             return findPrefix(tree["children"][t], rprefix)
 
         def addConstraint(tree, suffix):
             if suffix == []:
-                if "conditions" not in tree:
-                    tree["conditions"] = []
+                ensure_exists(tree, "conditions", [])
                 tree["conditions"].append((column, op, value))
                 return
             s, *rsuffix = suffix
-            if "children" not in tree:
-                tree["children"] = {}
-            if s not in tree["children"]:
-                tree["children"][s] = {}
+            ensure_exists(tree, "children", s, {})
             addConstraint(tree["children"][s], rsuffix)
 
 
-        if schema not in self.trees:
-            self.trees[schema] = {}
+        ensure_exists(self.trees, schema, {})
         prefixNode = findPrefix(self.trees[schema], prefix_tables)
 
         if suffix_tables == []:
-            if "conditions" not in prefixNode:
-                prefixNode["conditions"] = {}
-            if "conditions" not in prefixNode["conditions"]:
-                prefixNode["conditions"]["conditions"] = []
+            ensure_exists(prefixNode, "conditions", "conditions", [])
             prefixNode["conditions"]["conditions"].append((column, op, value))
         else:
             t, *ts = suffix_tables
-            if "conditions" not in prefixNode:
-                prefixNode["conditions"] = {}
-            if "children" not in prefixNode["conditions"]:
-                prefixNode["conditions"]["children"] = {}
-            if t not in prefixNode["conditions"]["children"]:
-                prefixNode["conditions"]["children"][t] = {}
-
+            ensure_exists(prefixNode, "conditions", "children", t, {})
             addConstraint(prefixNode["conditions"]["children"][t], ts)
 
 
