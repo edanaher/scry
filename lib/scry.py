@@ -247,7 +247,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     t1 = schema + "." + lastTable
     t2 = schema + "." + table
     k1, k2 = foreign_keys[t1][t2]
-    joins.append(f" JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
+    joins.append(f" LEFT JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
 
     for c, subTree in tree.get("children", {}).items():
         s, j, w = generate_sql(foreign_keys, subTree, schema, c, table)
