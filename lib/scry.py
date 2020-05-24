@@ -112,7 +112,7 @@ class buildTree(lark.Visitor):
         _, suffix_tables, column = self._split_path(suffix)
 
         op = "="
-        value = tree.children[1].value
+        value = tree.children[1].value[1:-1]
 
         def findPrefix(tree, prefix):
             if prefix == []:
@@ -187,9 +187,10 @@ def parse(table_info, query):
         TABLE: {choices(tables)}
         columns: COLUMN ("," COLUMN)*
         COLUMN: {choices(columns)} | "*"
-        VALUE: /[a-z0-9A-Z]+/
+        VALUE: ESCAPED_STRING
 
         %import common.CNAME -> NAME
+        %import common.ESCAPED_STRING
         %import common.WS
         %ignore WS
     """)
