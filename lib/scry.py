@@ -120,9 +120,11 @@ class buildTree(lark.Visitor):
             prefix, suffix = tree.children[0].children
             schema, prefix_tables, _ = self._split_path(prefix)
             _, suffix_tables, column = self._split_path(suffix)
-        else: # query_path
-            schema, prefix_tables, columns = self._split_path(tree.children[0])
-            column = columns[0]
+        else: # full_path
+            prefix, suffix = tree.children[0].children
+            schema, prefix_tables, _ = self._split_path(prefix)
+            column = suffix.children[0].value
+
             suffix_tables = []
 
         op = tree.children[1].children[0].value
@@ -134,7 +136,7 @@ class buildTree(lark.Visitor):
             if prefix == []:
                 return tree
             (t, *rprefix) = prefix
-            ensure_exists(self.trees, schema, "children", t, {})
+            ensure_exists(tree, "children", t, {})
             return findPrefix(tree["children"][t], rprefix)
 
         def addConstraint(tree, suffix):
@@ -170,8 +172,9 @@ def parse(table_info, query):
 
         query_path: (schema ".")? table ("." table)* ("." columns)?
 
-        condition: (condition_path | query_path) comparison_op VALUE
+        condition: (condition_path | condition_full_path) comparison_op VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
+        condition_full_path: condition_path_prefix "." column
         condition_path_prefix: (schema ".")? table ("." table)*
         condition_path_suffix: (table ".")* column
         !comparison_op: "=" | "<" | "<=" | ">=" | ">" | "LIKE"i | "ILIKE"i
