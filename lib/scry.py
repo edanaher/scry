@@ -111,7 +111,7 @@ class buildTree(lark.Visitor):
         schema, prefix_tables, _ = self._split_path(prefix)
         _, suffix_tables, column = self._split_path(suffix)
 
-        op = "eq"
+        op = "="
         value = tree.children[1].value
 
         def findPrefix(tree, prefix):
@@ -198,33 +198,49 @@ def parse(table_info, query):
     t.visit(parsed)
     return t.trees
 
+
 def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
+    def generate_condition_sql(tree):
+        raise Exception("Prefix conditions unimplemented")
+
     selects = []
     joins = []
+    wheres = []
     if not schema:
         for s, subTree in tree.items():
-            s, j = generate_sql(foreign_keys, subTree, s, None, None)
+            s, j, w = generate_sql(foreign_keys, subTree, s, None, None)
             selects += s
             joins += j
-        return (selects, joins)
+            wheres += w
+        return (selects, joins, wheres)
 
     if not table:
         for t, subTree in tree["children"].items():
-            s, j = generate_sql(foreign_keys, subTree, schema, t, None)
+            s, j, w = generate_sql(foreign_keys, subTree, schema, t, None)
             selects += s
             joins += j
-        return (selects, joins)
+            wheres += w
+        return (selects, joins, wheres)
 
     for c in tree.get("columns", []):
         selects.append(schema + "." + table + "." + c)
 
+    if "conditions" in tree:
+        for c in tree["conditions"].get("conditions", []):
+            print("Unpacking", repr(c))
+            col, op, value = c
+            wheres.append(f"{schema}.{table}.{col} {op} '{value}'")
+        if "children" in tree["conditions"]:
+            generate_condition_sql(tree["conditions"])
+
     if not lastTable:
         joins.append(schema + "." + table)
         for t, subTree in tree.get("children", {}).items():
-            s, j = generate_sql(foreign_keys, subTree, schema, t, table)
+            s, j, w = generate_sql(foreign_keys, subTree, schema, t, table)
             selects += s
             joins += j
-        return (selects, joins)
+            wheres += w
+        return (selects, joins, wheres)
 
     # a join table
     t1 = schema + "." + lastTable
@@ -233,17 +249,21 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     joins.append(f" JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
 
     for c, subTree in tree.get("children", {}).items():
-        s, j = generate_sql(foreign_keys, subTree, schema, c, table)
+        s, j, w = generate_sql(foreign_keys, subTree, schema, c, table)
         selects += s
         joins += j
+        wheres += w
 
-    return (selects, joins)
+    return (selects, joins, wheres)
 
 def serialize_sql(clauses):
-    selects, joins = clauses
+    selects, joins, wheres = clauses
     selects_string = ", ".join(selects)
     joins_string = " ".join(joins)
-    return f"SELECT {selects_string} FROM {joins_string}"
+    wheres_string = ""
+    if wheres != []:
+        wheres_string = " WHERE " + " AND ".join(wheres)
+    return f"SELECT {selects_string} FROM {joins_string} {wheres_string}"
 
 def main():
     db = psycopg2.connect("")
