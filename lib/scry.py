@@ -57,36 +57,45 @@ def get_foreign_keys(cur):
         keys[st2][st1] = (c2, c1)
     return keys
 
-def addToTree(tree, path, hasSchema = False):
-    if len(path) == 0:
-        tree["*"] = None
-        return
 
-    node = path[0]
+class buildTree(lark.Visitor):
+    def __init__(self):
+        self.trees = {}
 
-    if isinstance(node, lark.Tree):
-        for c in node.children:
-            addToTree(tree, c, hasSchema)
-        return
+    def query_path(self, tree):
+        if tree.children[0].data == "schema":
+            schema = tree.children[0].children[0].value
+            children = tree.children[1:]
+        else:
+            schema = DEFAULT_SCHEMA
+            children = tree.children
 
-    if isinstance(path, str):
-        tree[path] = None
-        return
+        if children[-1].data == "columns":
+            columns = [c.value for c in children[-1].children]
+            children = children[:-1]
+        else:
+            columns = ["*"]
 
-    # If there's no schema, use the default.
-    if not hasSchema and node.type != "SCHEMA":
-        if DEFAULT_SCHEMA not in tree:
-            tree[DEFAULT_SCHEMA] = {}
-        tree = tree[DEFAULT_SCHEMA]
+        tables = [c.children[0].value for c in children]
 
-    if node.type == "SCHEMA" or node.type == "TABLE":
-        if node.value not in tree:
-            tree[node.value] = {}
-        subTree = tree[node.value]
-        addToTree(subTree, path[1:], True)
+        def updateTree(tree, tables, columns):
+            if tables == []:
+                if "columns" not in tree:
+                    tree["columns"] = []
+                tree["columns"] += columns
+                return
 
-    if node.type == "COLUMN":
-        tree[node.value] = None
+            table, *rtables = tables
+            if "children" not in tree:
+                tree["children"] = {}
+            if table not in tree["children"]:
+                tree["children"][table] = {}
+
+            updateTree(tree["children"][table], rtables, columns)
+
+        if schema not in self.trees:
+            self.trees[schema] = {}
+        updateTree(self.trees[schema], tables, columns)
 
 
 def parse(table_info, query):
@@ -97,7 +106,9 @@ def parse(table_info, query):
     p = Lark(f"""
         start: component (" " component)*
         component: query_path
-        query_path: (SCHEMA ".")? TABLE ("." TABLE)* ("." columns)?
+        query_path: (schema ".")? table ("." table)* ("." columns)?
+        schema: SCHEMA
+        table: TABLE
         SCHEMA: {choices(schemas)}
         TABLE: {choices(tables)}
         columns: COLUMN ("," COLUMN)*
@@ -108,43 +119,48 @@ def parse(table_info, query):
         %ignore WS
     """)
     parsed = p.parse(query)
+    t = buildTree()
+    t.visit(parsed)
+    return t.trees
 
-    tree = {}
-    for component in parsed.children:
-        for subcomponent in component.children:
-            if(subcomponent.data == "query_path"):
-                addToTree(tree, subcomponent.children)
-    return tree
-
-def generate_sql(foreign_keys, tree, schema=None, lastTable=None, path=None):
+def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     selects = []
     joins = []
     if not schema:
         for s, subTree in tree.items():
-            s, j = generate_sql(foreign_keys, subTree, s, None, s)
+            s, j = generate_sql(foreign_keys, subTree, s, None, None)
             selects += s
             joins += j
         return (selects, joins)
+
+    if not table:
+        for t, subTree in tree["children"].items():
+            s, j = generate_sql(foreign_keys, subTree, schema, t, None)
+            selects += s
+            joins += j
+        return (selects, joins)
+
+    for c in tree.get("columns", []):
+        selects.append(schema + "." + table + "." + c)
 
     if not lastTable:
-        for t, subTree in tree.items():
-            joins.append(schema + "." + t)
-            s, j = generate_sql(foreign_keys, subTree, schema, t, schema + "." + t)
+        joins.append(schema + "." + table)
+        for t, subTree in tree.get("children", {}).items():
+            s, j = generate_sql(foreign_keys, subTree, schema, t, table)
             selects += s
             joins += j
         return (selects, joins)
 
-    for c, subTree in tree.items():
-        if subTree == None:
-            selects.append(schema + "." + lastTable + "." + c)
-        else:
-            t1 = schema + "." + lastTable
-            t2 = schema + "." + c
-            k1, k2 = foreign_keys[t1][t2]
-            joins.append(f" JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
-            s, j = generate_sql(foreign_keys, subTree, schema, c, path + "." + c)
-            selects += s
-            joins += j
+    # a join table
+    t1 = schema + "." + lastTable
+    t2 = schema + "." + table
+    k1, k2 = foreign_keys[t1][t2]
+    joins.append(f" JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
+
+    for c, subTree in tree.get("children", {}).items():
+        s, j = generate_sql(foreign_keys, subTree, schema, c, table)
+        selects += s
+        joins += j
 
     return (selects, joins)
 
