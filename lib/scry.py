@@ -176,7 +176,7 @@ def parse(table_info, query):
         condition_path: condition_path_prefix ":" condition_path_suffix
         condition_path_prefix: (schema ".")? table ("." table)*
         condition_path_suffix: (table ".")* column
-        !comparison_op: "=" | "<" | "<=" | ">=" | ">"
+        !comparison_op: "=" | "<" | "<=" | ">=" | ">" | "LIKE"i | "ILIKE"i
 
         schema: SCHEMA
         table: TABLE
