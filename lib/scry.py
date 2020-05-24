@@ -201,16 +201,19 @@ def parse(table_info, query):
     return t.trees
 
 
+def join_condition(foreign_keys, schema, t1, t2):
+    st1 = schema + "." + t1
+    st2 = schema + "." + t2
+    k1, k2 = foreign_keys[st1][st2]
+    return f"JOIN {st2} ON {st1}.{k1} = {st2}.{k2}"
+
 def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     def generate_condition_subquery(baseTable, tree):
         def subcondition_sql(tree, lastTable):
             joins = []
             wheres = []
             for t, subTree in tree.get("children", {}).items():
-                t1 = schema + "." + lastTable
-                t2 = schema + "." + t
-                k1, k2 = foreign_keys[t1][t2]
-                joins.append(f"JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
+                joins.append(join_condition(foreign_keys, schema, lastTable, t))
                 j, w = subcondition_sql(subTree, t)
                 joins += j
                 wheres += w
@@ -263,11 +266,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
             wheres += w
         return (selects, joins, wheres)
 
-    # a join table
-    t1 = schema + "." + lastTable
-    t2 = schema + "." + table
-    k1, k2 = foreign_keys[t1][t2]
-    joins.append(f" LEFT JOIN {t2} ON {t1}.{k1} = {t2}.{k2}")
+    joins.append(join_condition(foreign_keys, schema, lastTable, table))
 
     for c, subTree in tree.get("children", {}).items():
         s, j, w = generate_sql(foreign_keys, subTree, schema, c, table)
