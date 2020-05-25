@@ -54,12 +54,9 @@ def get_unique_keys(cur):
         ensure_exists(keys, schema, table, {})
         tkeys = keys[schema][table]
         if type == "PRIMARY KEY":
-            print(tkeys.get("type", "Notype"))
             if tkeys.get("type", "") != "primary":
-                print("Setting column",  table, column)
                 keys[schema][table] = { "type": "primary", "columns": [column] }
             else:
-                print("Adding column",  table, column)
                 keys[schema][table]["columns"].append(column)
         else: # UNIQUE
             if type in tkeys and tkeys["type"] == "primary":
@@ -290,7 +287,7 @@ def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None)
         sql = f"{schema}.{table}.id IN (SELECT {schema}.{table}.id FROM {joins_string} WHERE {wheres_string})"
         return sql
 
-    clauses = { "selects": [], "joins": [], "wheres": [] }
+    clauses = { "selects": [], "joins": [], "wheres": [], "uniques": [] }
     if not schema:
         for s, subTree in tree.items():
             subclauses = generate_sql(keys, subTree, s, None, None, s)
@@ -315,12 +312,18 @@ def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None)
             clauses["wheres"].append(generate_condition_subquery(table, tree["conditions"]))
 
     if not lastTable:
+        if table in keys["unique"][schema]:
+            cols = keys["unique"][schema][table]["columns"]
+            clauses["uniques"] += [(schema + "." + table + "." + c, path + "." + c) for c in cols]
         clauses["joins"].append(schema + "." + table)
         for t, subTree in tree.get("children", {}).items():
             subclauses = generate_sql(keys, subTree, schema, t, table, path + "." + t)
             merge_clauses(clauses, subclauses)
         return clauses
 
+    if table in keys["unique"][schema]:
+        cols = keys["unique"][schema][table]["columns"]
+        clauses["uniques"] += [(schema + "." + table + "." + c, path + "." + c) for c in cols]
     clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, table))
 
     for c, subTree in tree.get("children", {}).items():
@@ -330,7 +333,7 @@ def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None)
     return clauses
 
 def serialize_sql(clauses):
-    selects = clauses["selects"]
+    selects = clauses["uniques"] + clauses["selects"]
     joins = clauses["joins"]
     wheres = clauses["wheres"]
     selects_string = ", ".join([s[0] for s in selects])
@@ -353,6 +356,59 @@ def shared_prefix(l1, l2):
             return i
     return minlen
 
+def print_tree(tree, indent=""):
+    for k, v in tree.items():
+        if isinstance(v, dict):
+            print(f"{indent}- {k}:")
+            print_tree(v, indent + "  ")
+        else:
+            print(f"{k}: {v}")
+
+
+def reshape_results(cur, sql_clauses):
+    def tree_of_row(tree, path, value):
+        if len(path) == 1:
+            ensure_exists(tree, "fields", [])
+            tree["fields"].append((path[0], value))
+            return
+        p, *rpath = path
+        ensure_exists(tree, "children", p, {})
+        tree_of_row(tree["children"][p], rpath, value)
+
+    def add_to_main_tree(tree, tree_for_row):
+        for table, subtree in tree_for_row.items():
+            key = tuple(subtree.get("fields", (None,)))
+            ensure_exists(tree, table, key, {})
+            if "children" in subtree:
+                add_to_main_tree(tree[table][key], subtree["children"])
+
+    tree = {}
+
+    selects = [c[1] for c in sql_clauses["selects"]]
+    uniques = [c[1] for c in sql_clauses["uniques"]]
+    fields = uniques + selects
+
+    for row in cur:
+        tree_for_row = {}
+        for p, v in zip(fields, row):
+            tree_of_row(tree_for_row, p.split("."), v)
+        add_to_main_tree(tree, tree_for_row["children"])
+
+    return tree
+
+def print_results(results, path="", indent=""):
+    def print_fields(table, fields):
+        for k, v in fields:
+            print(f"{indent}- {path}{table}.{k}: {v}")
+
+    for t, subTree in results.items():
+        for fields, nextTree in subTree.items():
+            if fields != (None,):
+                print_fields(t, fields)
+                print_results(nextTree, "", indent + "  ")
+            else:
+                print_results(nextTree, path + t + ".", indent)
+
 def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
@@ -361,27 +417,21 @@ def main():
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
     unique_keys = get_unique_keys(cur)
-    print(unique_keys)
     query = args.command
     tree = parse(table_info, query)
 
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 
     sql_clauses = generate_sql(keys, tree)
+    uniques = sql_clauses["uniques"]
     sql = serialize_sql(sql_clauses)
 
     print(sql)
     cur.execute(sql)
-    print(sql_clauses["selects"])
 
-    last_path = []
-    for row in cur:
-        for (l, r) in zip(sql_clauses["selects"], list(row)):
-            path = l[1].split(".")
-            shared = shared_prefix(path, last_path)
-            print("  "*(shared - 1), end="")
-            print("- "*(len(path) - shared - 1), end="")
-            last_path = path
-            print(f"{path[-1]}: {r}")
+    results = reshape_results(cur, sql_clauses)
+
+    print_results(results)
+
 
 main()
