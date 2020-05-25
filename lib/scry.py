@@ -332,7 +332,7 @@ def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None)
 
     return clauses
 
-def serialize_sql(clauses):
+def serialize_sql(clauses, limit):
     selects = clauses["uniques"] + clauses["selects"]
     joins = clauses["joins"]
     wheres = clauses["wheres"]
@@ -341,12 +341,16 @@ def serialize_sql(clauses):
     wheres_string = ""
     if wheres != []:
         wheres_string = " WHERE " + " AND ".join(wheres)
-    return f"SELECT {selects_string} FROM {joins_string} {wheres_string}"
+    limit_string = ""
+    if limit != 0:
+        limit_string = f"LIMIT {limit}"
+    return f"SELECT {selects_string} FROM {joins_string} {wheres_string} {limit_string}"
 
 def parseargs():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--command", help="command to run")
     parser.add_argument("-d", "--database", help="database to connect to")
+    parser.add_argument("-l", "--limit", help="row limit (0 for no limit)", default=100, type=int)
     return parser.parse_args()
 
 def shared_prefix(l1, l2):
@@ -432,7 +436,7 @@ def main():
 
     sql_clauses = generate_sql(keys, tree)
     uniques = sql_clauses["uniques"]
-    sql = serialize_sql(sql_clauses)
+    sql = serialize_sql(sql_clauses, args.limit)
 
     print(sql)
     cur.execute(sql)
