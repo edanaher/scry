@@ -32,6 +32,57 @@ def get_table_info(cur):
         table_columns[t].append(c)
     return (list(schemas), list(tables), list(columns), table_columns)
 
+def get_unique_keys(cur):
+    query =  """SELECT
+        tc.table_schema,
+        tc.table_name,
+        tc.constraint_name,
+        tc.constraint_type,
+        kcu.column_name
+    FROM
+        information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+    WHERE
+        tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')"""
+
+    keys = {}
+    cur.execute(query)
+    for row in cur:
+        schema, table, name, type, column = row
+        ensure_exists(keys, schema, table, {})
+        tkeys = keys[schema][table]
+        if type == "PRIMARY KEY":
+            print(tkeys.get("type", "Notype"))
+            if tkeys.get("type", "") != "primary":
+                print("Setting column",  table, column)
+                keys[schema][table] = { "type": "primary", "columns": [column] }
+            else:
+                print("Adding column",  table, column)
+                keys[schema][table]["columns"].append(column)
+        else: # UNIQUE
+            if type in tkeys and tkeys["type"] == "primary":
+                continue
+            tkeys["type"] = "unique"
+            ensure_exists(tkeys, name, [])
+            tkeys[name].append(column)
+
+    # Pick the shortest unique key for each table
+    for _, schema_keys in keys.items():
+        for _, table_keys in schema_keys.items():
+            if table_keys["type"] == "primary":
+                continue
+            shortest = None
+            for k, columns in table_keys.items():
+                if k == "type":
+                    continue
+                if shortest is None or len(columns) < len(shortest):
+                    shortest = columns
+            table_keys["columns"] = shortest
+
+
+    return keys
 
 def get_foreign_keys(cur):
     query = """SELECT
@@ -310,6 +361,8 @@ def main():
 
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
+    unique_keys = get_unique_keys(cur)
+    print(unique_keys)
     query = args.command
     tree = parse(table_info, query)
 
