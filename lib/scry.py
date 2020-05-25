@@ -81,7 +81,6 @@ def get_unique_keys(cur):
                     shortest = columns
             table_keys["columns"] = shortest
 
-
     return keys
 
 def get_foreign_keys(cur):
@@ -272,12 +271,12 @@ def merge_clauses(dst, src):
         ensure_exists(dst, k, [])
         dst[k] += vs
 
-def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None, path=None):
+def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None):
     def generate_condition_subquery(baseTable, tree):
         def subcondition_sql(tree, lastTable):
             clauses = {"joins": [], "wheres": []}
             for t, subTree in tree.get("children", {}).items():
-                clauses["joins"].append(join_condition(foreign_keys, schema, lastTable, t))
+                clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, t))
                 subclauses = subcondition_sql(subTree, t)
                 merge_clauses(clauses, subclauses)
             for c in tree.get("conditions", []):
@@ -294,13 +293,13 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None, pa
     clauses = { "selects": [], "joins": [], "wheres": [] }
     if not schema:
         for s, subTree in tree.items():
-            subclauses = generate_sql(foreign_keys, subTree, s, None, None, s)
+            subclauses = generate_sql(keys, subTree, s, None, None, s)
             merge_clauses(clauses, subclauses)
         return clauses
 
     if not table:
         for t, subTree in tree["children"].items():
-            subclauses = generate_sql(foreign_keys, subTree, schema, t, None, path + "." + t)
+            subclauses = generate_sql(keys, subTree, schema, t, None, path + "." + t)
             merge_clauses(clauses, subclauses)
         return clauses
 
@@ -318,14 +317,14 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None, pa
     if not lastTable:
         clauses["joins"].append(schema + "." + table)
         for t, subTree in tree.get("children", {}).items():
-            subclauses = generate_sql(foreign_keys, subTree, schema, t, table, path + "." + t)
+            subclauses = generate_sql(keys, subTree, schema, t, table, path + "." + t)
             merge_clauses(clauses, subclauses)
         return clauses
 
-    clauses["joins"].append(join_condition(foreign_keys, schema, lastTable, table))
+    clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, table))
 
     for c, subTree in tree.get("children", {}).items():
-        subclauses = generate_sql(foreign_keys, subTree, schema, c, table, path + "." + c)
+        subclauses = generate_sql(keys, subTree, schema, c, table, path + "." + c)
         merge_clauses(clauses, subclauses)
 
     return clauses
@@ -366,7 +365,9 @@ def main():
     query = args.command
     tree = parse(table_info, query)
 
-    sql_clauses = generate_sql(foreign_keys, tree)
+    keys = { "unique": unique_keys, "foreign": foreign_keys }
+
+    sql_clauses = generate_sql(keys, tree)
     sql = serialize_sql(sql_clauses)
 
     print(sql)
