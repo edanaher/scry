@@ -301,6 +301,13 @@ def parseargs():
     parser.add_argument("-d", "--database", help="database to connect to")
     return parser.parse_args()
 
+def shared_prefix(l1, l2):
+    minlen = min(len(l1), len(l2))
+    for i in range(0, minlen):
+        if l1[i] != l2[i]:
+            return i
+    return minlen
+
 def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
@@ -318,8 +325,14 @@ def main():
     cur.execute(sql)
     print(sql_clauses[0])
 
+    last_path = []
     for row in cur:
         for (l, r) in zip(sql_clauses[0], list(row)):
-            print(f"{l[1]}: {r}")
+            path = l[1].split(".")
+            shared = shared_prefix(path, last_path)
+            print("  "*(shared - 1), end="")
+            print("- "*(len(path) - shared - 1), end="")
+            last_path = path
+            print(f"{path[-1]}: {r}")
 
 main()
