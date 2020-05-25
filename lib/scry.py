@@ -216,78 +216,73 @@ def join_condition(foreign_keys, schema, t1, t2):
     k1, k2 = foreign_keys[st1][st2]
     return f"JOIN {st2} ON {st1}.{k1} = {st2}.{k2}"
 
+def merge_clauses(dst, src):
+    for k, vs in src.items():
+        ensure_exists(dst, k, [])
+        dst[k] += vs
+
 def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None, path=None):
     def generate_condition_subquery(baseTable, tree):
         def subcondition_sql(tree, lastTable):
-            joins = []
-            wheres = []
+            clauses = {"joins": [], "wheres": []}
             for t, subTree in tree.get("children", {}).items():
-                joins.append(join_condition(foreign_keys, schema, lastTable, t))
-                j, w = subcondition_sql(subTree, t)
-                joins += j
-                wheres += w
+                clauses["joins"].append(join_condition(foreign_keys, schema, lastTable, t))
+                subclauses = subcondition_sql(subTree, t)
+                merge_clauses(clauses, subclauses)
             for c in tree.get("conditions", []):
                 col, op, value = c
-                wheres.append(f"{schema}.{lastTable}.{col} {op} {value}")
-            return (joins, wheres)
+                clauses["wheres"].append(f"{schema}.{lastTable}.{col} {op} {value}")
+            return clauses
 
-        joins, wheres = subcondition_sql(tree, baseTable)
-        joins_string = schema + "." + table + " " + " ".join(joins)
-        wheres_string = " AND ".join(wheres)
+        clauses = subcondition_sql(tree, baseTable)
+        joins_string = schema + "." + table + " " + " ".join(clauses["joins"])
+        wheres_string = " AND ".join(clauses["wheres"])
         sql = f"{schema}.{table}.id IN (SELECT {schema}.{table}.id FROM {joins_string} WHERE {wheres_string})"
         return sql
 
-    selects = []
-    joins = []
-    wheres = []
+    clauses = { "selects": [], "joins": [], "wheres": [] }
     if not schema:
         for s, subTree in tree.items():
-            s, j, w = generate_sql(foreign_keys, subTree, s, None, None, s)
-            selects += s
-            joins += j
-            wheres += w
-        return (selects, joins, wheres)
+            subclauses = generate_sql(foreign_keys, subTree, s, None, None, s)
+            merge_clauses(clauses, subclauses)
+        return clauses
 
     if not table:
         for t, subTree in tree["children"].items():
-            s, j, w = generate_sql(foreign_keys, subTree, schema, t, None, path + "." + t)
-            selects += s
-            joins += j
-            wheres += w
-        return (selects, joins, wheres)
+            subclauses = generate_sql(foreign_keys, subTree, schema, t, None, path + "." + t)
+            merge_clauses(clauses, subclauses)
+        return clauses
 
     for c in tree.get("columns", []):
         col = schema + "." + table + "." + c
-        selects.append((f"{col}", f"{path}.{c}"))
+        clauses["selects"].append((f"{col}", f"{path}.{c}"))
 
     if "conditions" in tree:
         for c in tree["conditions"].get("conditions", []):
             col, op, value = c
-            wheres.append(f"{schema}.{table}.{col} {op} {value}")
+            clauses["wheres"].append(f"{schema}.{table}.{col} {op} {value}")
         if "children" in tree["conditions"]:
-            wheres.append(generate_condition_subquery(table, tree["conditions"]))
+            clauses["wheres"].append(generate_condition_subquery(table, tree["conditions"]))
 
     if not lastTable:
-        joins.append(schema + "." + table)
+        clauses["joins"].append(schema + "." + table)
         for t, subTree in tree.get("children", {}).items():
-            s, j, w = generate_sql(foreign_keys, subTree, schema, t, table, path + "." + t)
-            selects += s
-            joins += j
-            wheres += w
-        return (selects, joins, wheres)
+            subclauses = generate_sql(foreign_keys, subTree, schema, t, table, path + "." + t)
+            merge_clauses(clauses, subclauses)
+        return clauses
 
-    joins.append(join_condition(foreign_keys, schema, lastTable, table))
+    clauses["joins"].append(join_condition(foreign_keys, schema, lastTable, table))
 
     for c, subTree in tree.get("children", {}).items():
-        s, j, w = generate_sql(foreign_keys, subTree, schema, c, table, path + "." + c)
-        selects += s
-        joins += j
-        wheres += w
+        subclauses = generate_sql(foreign_keys, subTree, schema, c, table, path + "." + c)
+        merge_clauses(clauses, subclauses)
 
-    return (selects, joins, wheres)
+    return clauses
 
 def serialize_sql(clauses):
-    selects, joins, wheres = clauses
+    selects = clauses["selects"]
+    joins = clauses["joins"]
+    wheres = clauses["wheres"]
     selects_string = ", ".join([s[0] for s in selects])
     joins_string = " ".join(joins)
     wheres_string = ""
@@ -323,11 +318,11 @@ def main():
 
     print(sql)
     cur.execute(sql)
-    print(sql_clauses[0])
+    print(sql_clauses["selects"])
 
     last_path = []
     for row in cur:
-        for (l, r) in zip(sql_clauses[0], list(row)):
+        for (l, r) in zip(sql_clauses["selects"], list(row)):
             path = l[1].split(".")
             shared = shared_prefix(path, last_path)
             print("  "*(shared - 1), end="")
