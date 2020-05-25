@@ -23,12 +23,14 @@ def get_table_info(cur):
 
     cur.execute(query)
 
+    table_columns = defaultdict(lambda: [])
     for row in cur:
         s, t, c = row
         schemas.add(s)
         tables.add(t)
         columns.add(c)
-    return (list(schemas), list(tables), list(columns))
+        table_columns[t].append(c)
+    return (list(schemas), list(tables), list(columns), table_columns)
 
 
 def get_foreign_keys(cur):
@@ -75,8 +77,9 @@ def ensure_exists(dict, *args):
 
 
 class buildTree(lark.Visitor):
-    def __init__(self):
+    def __init__(self, table_columns):
         self.trees = {}
+        self.table_columns = table_columns
 
     def _split_path(self, tree):
         if tree.children[0].data == "schema":
@@ -96,6 +99,11 @@ class buildTree(lark.Visitor):
             columns = ["*"]
 
         tables = [c.children[0].value for c in children]
+
+        # Should this just replace the *, and keep duplicated fields?
+        if "*" in columns:
+            columns = self.table_columns[tables[-1]]
+
 
         return (schema, tables, columns)
 
@@ -167,7 +175,7 @@ def parse(table_info, query):
     def choices(cs):
         return "|".join(sorted([f'"{c}"' for c in cs],key=len,reverse=True))
 
-    schemas, tables, columns = table_info
+    schemas, tables, columns, table_columns = table_info
     p = Lark(f"""
         start: component (" " component)*
         component: query_path | condition
@@ -197,7 +205,7 @@ def parse(table_info, query):
         %ignore WS
     """)
     parsed = p.parse(query)
-    t = buildTree()
+    t = buildTree(table_columns)
     t.visit(parsed)
     return t.trees
 
@@ -208,7 +216,7 @@ def join_condition(foreign_keys, schema, t1, t2):
     k1, k2 = foreign_keys[st1][st2]
     return f"JOIN {st2} ON {st1}.{k1} = {st2}.{k2}"
 
-def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
+def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None, path=None):
     def generate_condition_subquery(baseTable, tree):
         def subcondition_sql(tree, lastTable):
             joins = []
@@ -234,7 +242,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     wheres = []
     if not schema:
         for s, subTree in tree.items():
-            s, j, w = generate_sql(foreign_keys, subTree, s, None, None)
+            s, j, w = generate_sql(foreign_keys, subTree, s, None, None, s)
             selects += s
             joins += j
             wheres += w
@@ -242,14 +250,15 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
 
     if not table:
         for t, subTree in tree["children"].items():
-            s, j, w = generate_sql(foreign_keys, subTree, schema, t, None)
+            s, j, w = generate_sql(foreign_keys, subTree, schema, t, None, path + "." + t)
             selects += s
             joins += j
             wheres += w
         return (selects, joins, wheres)
 
     for c in tree.get("columns", []):
-        selects.append(schema + "." + table + "." + c)
+        col = schema + "." + table + "." + c
+        selects.append((f"{col}", f"{path}.{c}"))
 
     if "conditions" in tree:
         for c in tree["conditions"].get("conditions", []):
@@ -261,7 +270,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     if not lastTable:
         joins.append(schema + "." + table)
         for t, subTree in tree.get("children", {}).items():
-            s, j, w = generate_sql(foreign_keys, subTree, schema, t, table)
+            s, j, w = generate_sql(foreign_keys, subTree, schema, t, table, path + "." + t)
             selects += s
             joins += j
             wheres += w
@@ -270,7 +279,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
     joins.append(join_condition(foreign_keys, schema, lastTable, table))
 
     for c, subTree in tree.get("children", {}).items():
-        s, j, w = generate_sql(foreign_keys, subTree, schema, c, table)
+        s, j, w = generate_sql(foreign_keys, subTree, schema, c, table, path + "." + c)
         selects += s
         joins += j
         wheres += w
@@ -279,7 +288,7 @@ def generate_sql(foreign_keys, tree, schema=None, table=None, lastTable=None):
 
 def serialize_sql(clauses):
     selects, joins, wheres = clauses
-    selects_string = ", ".join(selects)
+    selects_string = ", ".join([s[0] for s in selects])
     joins_string = " ".join(joins)
     wheres_string = ""
     if wheres != []:
@@ -294,7 +303,6 @@ def parseargs():
 
 def main():
     args = parseargs()
-    print(args.database)
     db = psycopg2.connect(args.database or "")
     cur = db.cursor()
 
@@ -308,8 +316,10 @@ def main():
 
     print(sql)
     cur.execute(sql)
+    print(sql_clauses[0])
 
     for row in cur:
-        print(row)
+        for (l, r) in zip(sql_clauses[0], list(row)):
+            print(f"{l[1]}: {r}")
 
 main()
