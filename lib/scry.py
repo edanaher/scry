@@ -286,13 +286,21 @@ def serialize_sql(clauses):
         wheres_string = " WHERE " + " AND ".join(wheres)
     return f"SELECT {selects_string} FROM {joins_string} {wheres_string}"
 
+def parseargs():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--command", help="command to run")
+    parser.add_argument("-d", "--database", help="database to connect to")
+    return parser.parse_args()
+
 def main():
-    db = psycopg2.connect("")
+    args = parseargs()
+    print(args.database)
+    db = psycopg2.connect(args.database or "")
     cur = db.cursor()
 
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
-    query = sys.argv[1]
+    query = args.command
     tree = parse(table_info, query)
 
     sql_clauses = generate_sql(foreign_keys, tree)
