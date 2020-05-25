@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
+import argparse
 from collections import defaultdict
 import psycopg2
 from lark import Lark
 import lark
 import sys
 
-DEFAULT_SCHEMA="scry"
+DEFAULT_SCHEMA="public"
 
 def get_table_info(cur):
     schemas = set()
@@ -17,7 +18,8 @@ def get_table_info(cur):
         table_name,
         column_name
     FROM information_schema.columns
-    WHERE table_schema='scry'"""
+    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+    """
 
     cur.execute(query)
 
