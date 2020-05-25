@@ -366,45 +366,53 @@ def print_tree(tree, indent=""):
 
 
 def reshape_results(cur, sql_clauses):
-    def tree_of_row(tree, path, value):
+    def tree_of_row(tree, path, display, value):
         if len(path) == 1:
-            ensure_exists(tree, "fields", [])
-            tree["fields"].append((path[0], value))
+            if display:
+                ensure_exists(tree, "display", [])
+                tree["display"].append((path[0], value))
+            else:
+                ensure_exists(tree, "hidden", [])
+                tree["hidden"].append((path[0], value))
             return
         p, *rpath = path
         ensure_exists(tree, "children", p, {})
-        tree_of_row(tree["children"][p], rpath, value)
+        tree_of_row(tree["children"][p], rpath, display, value)
 
     def add_to_main_tree(tree, tree_for_row):
         for table, subtree in tree_for_row.items():
-            key = tuple(subtree.get("fields", (None,)))
+            display = tuple(subtree.get("display", (None,)))
+            hidden = tuple(subtree.get("hidden", (None,)))
+            key = (display, hidden)
             ensure_exists(tree, table, key, {})
             if "children" in subtree:
                 add_to_main_tree(tree[table][key], subtree["children"])
 
     tree = {}
 
-    selects = [c[1] for c in sql_clauses["selects"]]
-    uniques = [c[1] for c in sql_clauses["uniques"]]
+    selects = [(c[1], True) for c in sql_clauses["selects"]]
+    uniques = [(c[1], False) for c in sql_clauses["uniques"]]
     fields = uniques + selects
 
     for row in cur:
         tree_for_row = {}
-        for p, v in zip(fields, row):
-            tree_of_row(tree_for_row, p.split("."), v)
+        for (p, d), v in zip(fields, row):
+            tree_of_row(tree_for_row, p.split("."), d, v)
         add_to_main_tree(tree, tree_for_row["children"])
 
     return tree
 
 def print_results(results, path="", indent=""):
     def print_fields(table, fields):
-        for k, v in fields:
-            print(f"{indent}- {path}{table}.{k}: {v}")
+        k, v = fields[0]
+        print(f"{indent}- {path}{table}.{k}: {v}")
+        for k, v in fields[1:]:
+            print(f"{indent}  {path}{table}.{k}: {v}")
 
     for t, subTree in results.items():
-        for fields, nextTree in subTree.items():
-            if fields != (None,):
-                print_fields(t, fields)
+        for (display, hidden), nextTree in subTree.items():
+            if display != (None,):
+                print_fields(t, display)
                 print_results(nextTree, "", indent + "  ")
             else:
                 print_results(nextTree, path + t + ".", indent)
