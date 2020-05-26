@@ -18,7 +18,6 @@ def get_table_info(cur):
         table_name,
         column_name
     FROM information_schema.columns
-    WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
     """
 
     cur.execute(query)
@@ -124,28 +123,50 @@ def ensure_exists(dict, *args):
 
 
 class buildTree(lark.Visitor):
-    def __init__(self, table_columns):
+    def __init__(self, table_columns, foreign_keys, schemas):
         self.trees = {}
         self.table_columns = table_columns
+        self.foreign_keys = foreign_keys
+        self.schemas = schemas
 
     def _split_path(self, tree):
-        if tree.children[0].data == "schema":
+        if tree.children[0].children[0].value in self.schemas:
             schema = tree.children[0].children[0].value
             children = tree.children[1:]
         else:
             schema = DEFAULT_SCHEMA
             children = tree.children
 
+        first_table = children[0].children[0]
+        if first_table not in self.table_columns:
+            raise Exception("Unknown table: " + first_table)
+        tables = [first_table]
+
+        for child in children[1:-1]:
+            table = child.children[0]
+            if table not in self.table_columns:
+                raise Exception("Unknown table: " + table)
+            if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1], []):
+                raise Exception(f"No known join: {tables[-1]} to {table}")
+            tables.append(table)
+
         if children[-1].data == "columns":
+            # TODO: Filter out unknown columns
             columns = [c.value for c in children[-1].children]
             children = children[:-1]
-        elif children[-1].data == "column":
-            columns = children[-1].children[0].value
-            children = children[:-1]
         else:
-            columns = ["*"]
-
-        tables = [c.children[0].value for c in children]
+            name = children[-1].children[0].value
+            print("Checking if", name, "is in", self.table_columns[tables[-1]])
+            if name in self.table_columns[tables[-1]]:
+                # It's a column...
+                columns = [name]
+            else:
+                # Assume it's a table
+                if table not in self.table_columns:
+                    raise Exception("Unknown table: " + table)
+                if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1], []):
+                    raise Exception(f"No known join: {tables[-1]} to {table}")
+                columns = ["*"]
 
         # Should this just replace the *, and keep duplicated fields?
         if "*" in columns:
@@ -218,7 +239,7 @@ class buildTree(lark.Visitor):
             addConstraint(prefixNode["conditions"]["children"][t], ts)
 
 
-def parse(table_info, query):
+def parse(table_info, foreign_keys, query):
     def choices(cs):
         return "|".join(sorted([f'"{c}"' for c in cs],key=len,reverse=True))
 
@@ -239,10 +260,10 @@ def parse(table_info, query):
         schema: SCHEMA
         table: TABLE
         column: COLUMN
-        SCHEMA: {choices(schemas)}
-        TABLE: {choices(tables)}
+        SCHEMA: NAME
+        TABLE: NAME
         columns: COLUMN ("," COLUMN)*
-        COLUMN: {choices(columns)} | "*"
+        COLUMN: NAME | "*"
         VALUE: ESCAPED_STRING | SIGNED_NUMBER
 
         %import common.CNAME -> NAME
@@ -252,7 +273,7 @@ def parse(table_info, query):
         %ignore WS
     """)
     parsed = p.parse(query)
-    t = buildTree(table_columns)
+    t = buildTree(table_columns, foreign_keys, schemas)
     t.visit(parsed)
     return t.trees
 
@@ -430,7 +451,7 @@ def main():
     foreign_keys = get_foreign_keys(cur)
     unique_keys = get_unique_keys(cur)
     query = args.command
-    tree = parse(table_info, query)
+    tree = parse(table_info, foreign_keys, query)
 
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 
