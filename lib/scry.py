@@ -168,7 +168,7 @@ class buildTree(lark.Visitor):
                     raise Exception("Unknown table: " + name)
                 if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1], []):
                     raise Exception(f"No known join: {tables[-1]} to {name}")
-                tables.append(name.value)
+                tables.append(name)
                 columns = ["*"]
 
         # Should this just replace the *, and keep duplicated fields?
