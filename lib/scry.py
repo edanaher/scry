@@ -7,7 +7,7 @@ from lark import Lark
 import lark
 import sys
 
-DEFAULT_SCHEMA="public"
+DEFAULT_SCHEMA="scry"
 
 def get_table_info(cur):
     schemas = set()
@@ -128,19 +128,22 @@ class buildTree(lark.Visitor):
         self.table_columns = table_columns
         self.foreign_keys = foreign_keys
         self.schemas = schemas
+        self.table_to_node = {}
 
     def _split_path(self, tree):
         if tree.children[0].children[0].value in self.schemas:
             schema = tree.children[0].children[0].value
+            explicit_schema = schema
             children = tree.children[1:]
         else:
             schema = DEFAULT_SCHEMA
+            explicit_schema = None
             children = tree.children
 
         first_table = children[0].children[0]
         if first_table not in self.table_columns:
             raise Exception("Unknown table: " + first_table)
-        tables = [first_table]
+        tables = [first_table.value]
 
         for child in children[1:-1]:
             table = child.children[0]
@@ -148,7 +151,7 @@ class buildTree(lark.Visitor):
                 raise Exception("Unknown table: " + table)
             if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1], []):
                 raise Exception(f"No known join: {tables[-1]} to {table}")
-            tables.append(table)
+            tables.append(table.value)
 
         if children[-1].data == "columns" and len(children[-1].children) > 1:
             # TODO: Filter out unknown columns
@@ -165,7 +168,7 @@ class buildTree(lark.Visitor):
                     raise Exception("Unknown table: " + name)
                 if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1], []):
                     raise Exception(f"No known join: {tables[-1]} to {name}")
-                tables.append(name)
+                tables.append(name.value)
                 columns = ["*"]
 
         # Should this just replace the *, and keep duplicated fields?
@@ -173,7 +176,7 @@ class buildTree(lark.Visitor):
             columns = self.table_columns[tables[-1]]
 
 
-        return (schema, tables, columns)
+        return (explicit_schema, tables, columns)
 
 
     def query_path(self, tree):
@@ -187,11 +190,32 @@ class buildTree(lark.Visitor):
 
             table, *rtables = tables
             ensure_exists(tree, "children", table, {})
+            print("adding", table, "at", tree)
+            if table in self.table_to_node:
+                existing = self.table_to_node[table]
+                if tree != existing:
+                    raise Exception(f"Table {table} duplicated in tree!")
+            else:
+                self.table_to_node[table] = tree
 
             updateTree(tree["children"][table], rtables, columns)
 
-        ensure_exists(self.trees, schema, {})
-        updateTree(self.trees[schema], tables, columns)
+        # If the table's already in the tree, merge it in there instead of
+        # starting a new tree.
+        print(f"Checking for {schema}, {tables[0]} in {self.table_to_node}")
+        if not schema and tables[0] in self.table_to_node:
+            print("Exists")
+            query_root = self.table_to_node[tables[0]]
+        else:
+            print("Doesn't")
+            ensure_exists(self.trees, schema, {})
+            query_root = self.trees[schema]
+
+        updateTree(query_root, tables, columns)
+        for k, t in self.trees.items():
+            print(k)
+            print_tree(t)
+        print("="*40)
 
     def condition(self, tree):
         if tree.children[0].data == "condition_path":
@@ -237,6 +261,7 @@ class buildTree(lark.Visitor):
             t, *ts = suffix_tables
             ensure_exists(prefixNode, "conditions", "children", t, {})
             addConstraint(prefixNode["conditions"]["children"][t], ts)
+
 
 
 def parse(table_info, foreign_keys, query):
@@ -384,10 +409,10 @@ def shared_prefix(l1, l2):
 def print_tree(tree, indent=""):
     for k, v in tree.items():
         if isinstance(v, dict):
-            print(f"{indent}- {k}:")
+            print(f"{indent}- {repr(k)}:")
             print_tree(v, indent + "  ")
         else:
-            print(f"{k}: {v}")
+            print(f"{indent}  {repr(k)}: {repr(v)}")
 
 
 def reshape_results(cur, sql_clauses):
