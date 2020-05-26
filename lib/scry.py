@@ -150,22 +150,22 @@ class buildTree(lark.Visitor):
                 raise Exception(f"No known join: {tables[-1]} to {table}")
             tables.append(table)
 
-        if children[-1].data == "columns":
+        if children[-1].data == "columns" and len(children[-1].children) > 1:
             # TODO: Filter out unknown columns
             columns = [c.value for c in children[-1].children]
             children = children[:-1]
         else:
             name = children[-1].children[0].value
-            print("Checking if", name, "is in", self.table_columns[tables[-1]])
             if name in self.table_columns[tables[-1]]:
                 # It's a column...
                 columns = [name]
             else:
                 # Assume it's a table
-                if table not in self.table_columns:
-                    raise Exception("Unknown table: " + table)
-                if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1], []):
-                    raise Exception(f"No known join: {tables[-1]} to {table}")
+                if name not in self.table_columns:
+                    raise Exception("Unknown table: " + name)
+                if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1], []):
+                    raise Exception(f"No known join: {tables[-1]} to {name}")
+                tables.append(name)
                 columns = ["*"]
 
         # Should this just replace the *, and keep duplicated fields?
