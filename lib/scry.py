@@ -7,7 +7,7 @@ from lark import Lark
 import lark
 import sys
 
-DEFAULT_SCHEMA="scry"
+default_schema = "public"
 
 def get_table_info(cur):
     schemas = set()
@@ -136,7 +136,7 @@ class buildTree(lark.Visitor):
             explicit_schema = schema
             children = tree.children[1:]
         else:
-            schema = DEFAULT_SCHEMA
+            schema = default_schema
             explicit_schema = None
             children = tree.children
 
@@ -397,6 +397,7 @@ def parseargs():
     parser.add_argument("-c", "--command", help="command to run")
     parser.add_argument("-d", "--database", help="database to connect to")
     parser.add_argument("-l", "--limit", help="row limit (0 for no limit)", default=100, type=int)
+    parser.add_argument("-s", "--schema", help="default schema", default="public")
     return parser.parse_args()
 
 def shared_prefix(l1, l2):
@@ -471,6 +472,8 @@ def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
     cur = db.cursor()
+    global default_schema
+    default_schema = args.schema
 
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
