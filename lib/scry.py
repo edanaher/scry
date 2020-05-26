@@ -159,7 +159,7 @@ class buildTree(lark.Visitor):
             children = children[:-1]
         else:
             name = children[-1].children[0].value
-            if name in self.table_columns[tables[-1]]:
+            if name in self.table_columns[tables[-1]] or name == "*":
                 # It's a column...
                 columns = [name]
             else:
@@ -189,15 +189,24 @@ class buildTree(lark.Visitor):
                 return
 
             table, *rtables = tables
-            ensure_exists(tree, "children", table, {})
+            ensure_exists(tree, "children", {})
             print("adding", table, "at", tree)
             if table in self.table_to_node:
                 existing = self.table_to_node[table]
                 if tree != existing:
-                    raise Exception(f"Table {table} duplicated in tree!")
+                    # If the tree isn't a root, we have a problem.
+                    if existing != self.trees[None]:
+                        raise Exception(f"Table {table} duplicated in tree!")
+
+                    # If the existing tree is a root, splice it in here.
+                    tree["children"][table] = self.trees[None]["children"][table]
+                    self.trees[None]["children"].pop(table)
+                    if self.trees[None]["children"] == {}:
+                        self.trees.pop(None)
             else:
                 self.table_to_node[table] = tree
 
+            ensure_exists(tree, "children", table, {})
             updateTree(tree["children"][table], rtables, columns)
 
         # If the table's already in the tree, merge it in there instead of
@@ -207,7 +216,6 @@ class buildTree(lark.Visitor):
             print("Exists")
             query_root = self.table_to_node[tables[0]]
         else:
-            print("Doesn't")
             ensure_exists(self.trees, schema, {})
             query_root = self.trees[schema]
 
