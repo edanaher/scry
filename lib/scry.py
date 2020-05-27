@@ -294,21 +294,19 @@ def parse(table_info, foreign_keys, query):
         start: component (" " component)*
         component: query_path | condition
 
-        query_path: (schema ".")? table ("." table)* ("." columns)?
+        query_path: path_elem ("." path_elem)* ("." columns)?
 
         condition: (condition_path | condition_full_path) comparison_op VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
         condition_full_path: condition_path_prefix "." column
-        condition_path_prefix: (schema ".")? table ("." table)*
-        condition_path_suffix: (table ".")* column
+        condition_path_prefix: path_elem ("." path_elem)*
+        condition_path_suffix: path_elem ("." path_elem)*
         !comparison_op: "=" | "<" | "<=" | ">=" | ">" | "LIKE"i | "ILIKE"i
 
-        schema: SCHEMA
-        table: TABLE
-        column: COLUMN
-        SCHEMA: NAME
-        TABLE: NAME
+        path_elem: COMPONENT
         columns: COLUMN ("," COLUMN)*
+        column: COLUMN
+        COMPONENT: NAME
         COLUMN: NAME | "*"
         VALUE: ESCAPED_STRING | SIGNED_NUMBER
 
