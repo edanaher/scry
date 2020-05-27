@@ -352,7 +352,7 @@ def join_condition(foreign_keys, schema, t1, t2, a1, a2):
     alias_string = " AS " + a2 if a2 != t2 else ""
     j1 = a1 if a1 != t1 else st1
     j2 = a2 if a2 != t2 else st2
-    return f"JOIN {st2}{alias_string} ON {j1}.{k1} = {j2}.{k2}"
+    return f"LEFT JOIN {st2}{alias_string} ON {j1}.{k1} = {j2}.{k2}"
 
 def merge_clauses(dst, src):
     for k, vs in src.items():
