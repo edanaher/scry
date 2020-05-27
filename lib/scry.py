@@ -159,10 +159,13 @@ class buildTree(lark.Visitor):
             children = children[:-1]
         else:
             name = children[-1].children[0].value
-            if name in self.table_columns[tables[-1]] or name == "*":
+            if len(children) == 1:
+                columns = ["*"]
+            elif name in self.table_columns[tables[-1]] or name == "*":
                 # It's a column...
                 columns = [name]
             else:
+                print("name is ", name)
                 # Assume it's a table
                 if name not in self.table_columns:
                     raise Exception("Unknown table: " + name)
@@ -178,6 +181,22 @@ class buildTree(lark.Visitor):
 
         return (explicit_schema, tables, columns)
 
+    def _handle_table_node_mapping(self, tree, table):
+        print("adding", table, "at", tree)
+        if table in self.table_to_node:
+            existing = self.table_to_node[table]
+            if tree != existing:
+                # If the tree isn't a root, we have a problem.
+                if existing != self.trees[None]:
+                    raise Exception(f"Table {table} duplicated in tree!")
+
+                # If the existing tree is a root, splice it in here.
+                tree["children"][table] = self.trees[None]["children"][table]
+                self.trees[None]["children"].pop(table)
+                if self.trees[None]["children"] == {}:
+                    self.trees.pop(None)
+        else:
+            self.table_to_node[table] = tree
 
     def query_path(self, tree):
         schema, tables, columns = self._split_path(tree)
@@ -190,28 +209,12 @@ class buildTree(lark.Visitor):
 
             table, *rtables = tables
             ensure_exists(tree, "children", {})
-            print("adding", table, "at", tree)
-            if table in self.table_to_node:
-                existing = self.table_to_node[table]
-                if tree != existing:
-                    # If the tree isn't a root, we have a problem.
-                    if existing != self.trees[None]:
-                        raise Exception(f"Table {table} duplicated in tree!")
-
-                    # If the existing tree is a root, splice it in here.
-                    tree["children"][table] = self.trees[None]["children"][table]
-                    self.trees[None]["children"].pop(table)
-                    if self.trees[None]["children"] == {}:
-                        self.trees.pop(None)
-            else:
-                self.table_to_node[table] = tree
-
+            self._handle_table_node_mapping(tree, table)
             ensure_exists(tree, "children", table, {})
             updateTree(tree["children"][table], rtables, columns)
 
         # If the table's already in the tree, merge it in there instead of
         # starting a new tree.
-        print(f"Checking for {schema}, {tables[0]} in {self.table_to_node}")
         if not schema and tables[0] in self.table_to_node:
             print("Exists")
             query_root = self.table_to_node[tables[0]]
@@ -232,6 +235,7 @@ class buildTree(lark.Visitor):
             _, suffix_tables, column = self._split_path(suffix)
         else: # full_path
             prefix, suffix = tree.children[0].children
+            print(f"prefix/suffix: {prefix}/{suffix}")
             schema, prefix_tables, _ = self._split_path(prefix)
             column = suffix.children[0].value
 
@@ -259,8 +263,17 @@ class buildTree(lark.Visitor):
             addConstraint(tree["children"][s], rsuffix)
 
 
-        ensure_exists(self.trees, schema, {})
-        prefixNode = findPrefix(self.trees[schema], prefix_tables)
+        # If the table's already in the tree, merge it in there instead of
+        # starting a new tree.
+        first_name = prefix.children[0].children[0].value
+        if not schema and prefix.children and first_name in self.table_to_node:
+            query_root = self.table_to_node[first_name]
+        else:
+            print("Doesn't exist")
+            ensure_exists(self.trees, schema, {})
+            query_root = self.trees[schema]
+
+        prefixNode = findPrefix(query_root, prefix_tables)
 
         if suffix_tables == []:
             ensure_exists(prefixNode, "conditions", "conditions", [])
