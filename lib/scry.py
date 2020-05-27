@@ -129,6 +129,25 @@ class buildTree(lark.Visitor):
         self.foreign_keys = foreign_keys
         self.schemas = schemas
         self.table_to_node = {}
+        self.aliases = {}
+
+    def _table_alias(self, tree):
+        table = tree.children[0].value
+        if len(tree.children) > 1:
+            # An alias; save it.
+            alias = tree.children[1].value
+        else:
+            if table in self.aliases:
+                # If it's just an alias, pull it out.
+                alias = table
+                table = self.aliases[alias]
+            else:
+                # If it's just a table, it aliases to itself.
+                alias = table
+        if alias in self.aliases and self.aliases[alias] != table:
+            raise Exception(f"Alias conflict: {alias} used for both {self.aliases[alias]} and {table}")
+        self.aliases[alias] = table
+        return (table, alias)
 
     def _split_path(self, tree):
         if tree.children[0].children[0].value in self.schemas:
@@ -140,18 +159,19 @@ class buildTree(lark.Visitor):
             explicit_schema = None
             children = tree.children
 
-        first_table = children[0].children[0]
+        (first_table, first_alias) = self._table_alias(children[0])
+        print("first_table is", repr(first_table))
         if first_table not in self.table_columns:
             raise Exception("Unknown table: " + first_table)
-        tables = [first_table.value]
+        tables = [(first_table, first_alias)]
 
         for child in children[1:-1]:
-            table = child.children[0]
+            (table, alias) = self._table_alias(child)
             if table not in self.table_columns:
                 raise Exception("Unknown table: " + table)
-            if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1], []):
+            if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
                 raise Exception(f"No known join: {tables[-1]} to {table}")
-            tables.append(table.value)
+            tables.append((table, alias))
 
         if children[-1].data == "columns" and len(children[-1].children) > 1:
             # TODO: Filter out unknown columns
@@ -160,18 +180,19 @@ class buildTree(lark.Visitor):
         else:
             name = children[-1].children[0].value
             if len(children) == 1:
+                # It's a standalone table; we already got it as first_table, and assume all fields.
                 columns = ["*"]
-            elif name in self.table_columns[tables[-1]] or name == "*":
+            elif name in self.table_columns[tables[-1][0]] or name == "*":
                 # It's a column...
                 columns = [name]
             else:
-                print("name is ", name)
                 # Assume it's a table
                 if name not in self.table_columns:
-                    raise Exception("Unknown table: " + name)
-                if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1], []):
+                    raise Exception("Unknown table or column: " + name)
+                if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
                     raise Exception(f"No known join: {tables[-1]} to {name}")
-                tables.append(name)
+                (table, alias) = self._table_alias(children[-1])
+                tables.append((table, alias))
                 columns = ["*"]
 
         # Should this just replace the *, and keep duplicated fields?
@@ -182,7 +203,6 @@ class buildTree(lark.Visitor):
         return (explicit_schema, tables, columns)
 
     def _handle_table_node_mapping(self, tree, table):
-        print("adding", table, "at", tree)
         if table in self.table_to_node:
             existing = self.table_to_node[table]
             if tree != existing:
@@ -200,6 +220,9 @@ class buildTree(lark.Visitor):
 
     def query_path(self, tree):
         schema, tables, columns = self._split_path(tree)
+        print("schema: ", schema)
+        print("tables: ", tables)
+
 
         def updateTree(tree, tables, columns):
             if tables == []:
@@ -207,17 +230,17 @@ class buildTree(lark.Visitor):
                 tree["columns"] += columns
                 return
 
-            table, *rtables = tables
+            (table, alias), *rtables = tables
             ensure_exists(tree, "children", {})
-            self._handle_table_node_mapping(tree, table)
-            ensure_exists(tree, "children", table, {})
-            updateTree(tree["children"][table], rtables, columns)
+            self._handle_table_node_mapping(tree, alias)
+            ensure_exists(tree, "children", alias, {})
+            tree["children"][alias]["table"] = table
+            updateTree(tree["children"][alias], rtables, columns)
 
         # If the table's already in the tree, merge it in there instead of
         # starting a new tree.
-        if not schema and tables[0] in self.table_to_node:
-            print("Exists")
-            query_root = self.table_to_node[tables[0]]
+        if not schema and tables[0][1] in self.table_to_node:
+            query_root = self.table_to_node[tables[0][1]]
         else:
             ensure_exists(self.trees, schema, {})
             query_root = self.trees[schema]
@@ -303,7 +326,7 @@ def parse(table_info, foreign_keys, query):
         condition_path_suffix: path_elem ("." path_elem)*
         !comparison_op: "=" | "<" | "<=" | ">=" | ">" | "LIKE"i | "ILIKE"i
 
-        path_elem: COMPONENT
+        path_elem: COMPONENT ("@" NAME)?
         columns: COLUMN ("," COLUMN)*
         column: COLUMN
         COMPONENT: NAME
@@ -322,28 +345,33 @@ def parse(table_info, foreign_keys, query):
     return t.trees
 
 
-def join_condition(foreign_keys, schema, t1, t2):
+def join_condition(foreign_keys, schema, t1, t2, a1, a2):
     st1 = schema + "." + t1
     st2 = schema + "." + t2
     k1, k2 = foreign_keys[st1][st2]
-    return f"JOIN {st2} ON {st1}.{k1} = {st2}.{k2}"
+    alias_string = " AS " + a2 if a2 != t2 else ""
+    j1 = a1 if a1 != t1 else st1
+    j2 = a2 if a2 != t2 else st2
+    return f"JOIN {st2}{alias_string} ON {j1}.{k1} = {j2}.{k2}"
 
 def merge_clauses(dst, src):
     for k, vs in src.items():
         ensure_exists(dst, k, [])
         dst[k] += vs
 
-def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None):
+def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None, lastTable=None, path=None):
+    print(f"generating for table@alias: {table}@{alias}, last is {lastTable}@{lastAlias}")
     def generate_condition_subquery(baseTable, tree):
-        def subcondition_sql(tree, lastTable):
+        def subcondition_sql(tree, lastAlias):
             clauses = {"joins": [], "wheres": []}
-            for t, subTree in tree.get("children", {}).items():
-                clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, t))
+            for a, subTree in tree.get("children", {}).items():
+                t = subTree["table"]
+                clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, t, lastAlias, a))
                 subclauses = subcondition_sql(subTree, t)
                 merge_clauses(clauses, subclauses)
             for c in tree.get("conditions", []):
                 col, op, value = c
-                clauses["wheres"].append(f"{schema}.{lastTable}.{col} {op} {value}")
+                clauses["wheres"].append(f"{schema}.{lastAlias}.{col} {op} {value}")
             return clauses
 
         clauses = subcondition_sql(tree, baseTable)
@@ -355,18 +383,20 @@ def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None)
     clauses = { "selects": [], "joins": [], "wheres": [], "uniques": [] }
     if not schema:
         for s, subTree in tree.items():
-            subclauses = generate_sql(keys, subTree, s, None, None, s)
+            subclauses = generate_sql(keys, subTree, s, None, None, None, None, s)
             merge_clauses(clauses, subclauses)
         return clauses
 
     if not table:
-        for t, subTree in tree["children"].items():
-            subclauses = generate_sql(keys, subTree, schema, t, None, path + "." + t)
+        for a, subTree in tree["children"].items():
+            t = subTree["table"]
+            subclauses = generate_sql(keys, subTree, schema, t, a, None, None, path + "." + a)
             merge_clauses(clauses, subclauses)
         return clauses
 
     for c in tree.get("columns", []):
-        col = schema + "." + table + "." + c
+        query_name = alias if alias != table else schema + "." + table
+        col = query_name + "." + c
         clauses["selects"].append((f"{col}", f"{path}.{c}"))
 
     if "conditions" in tree:
@@ -378,21 +408,26 @@ def generate_sql(keys, tree, schema=None, table=None, lastTable=None, path=None)
 
     if not lastTable:
         if table in keys["unique"][schema]:
+            query_name = alias if alias != table else schema + "." + table
             cols = keys["unique"][schema][table]["columns"]
-            clauses["uniques"] += [(schema + "." + table + "." + c, path + "." + c) for c in cols]
-        clauses["joins"].append(schema + "." + table)
-        for t, subTree in tree.get("children", {}).items():
-            subclauses = generate_sql(keys, subTree, schema, t, table, path + "." + t)
+            clauses["uniques"] += [(query_name + "." + c, path + "." + c) for c in cols]
+        alias_string = " AS " + alias if alias != table else ""
+        clauses["joins"].append(schema + "." + table + alias_string)
+        for a, subTree in tree.get("children", {}).items():
+            t = subTree["table"]
+            subclauses = generate_sql(keys, subTree, schema, t, a, alias, table, path + "." + t)
             merge_clauses(clauses, subclauses)
         return clauses
 
     if table in keys["unique"][schema]:
+        query_name = alias if alias != table else schema + "." + table
         cols = keys["unique"][schema][table]["columns"]
-        clauses["uniques"] += [(schema + "." + table + "." + c, path + "." + c) for c in cols]
-    clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, table))
+        clauses["uniques"] += [(query_name + "." + c, path + "." + c) for c in cols]
+    clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, table, lastAlias, alias))
 
-    for c, subTree in tree.get("children", {}).items():
-        subclauses = generate_sql(keys, subTree, schema, c, table, path + "." + c)
+    for a, subTree in tree.get("children", {}).items():
+        t = subTree["table"]
+        subclauses = generate_sql(keys, subTree, schema, t, a, alias, table, path + "." + a)
         merge_clauses(clauses, subclauses)
 
     return clauses
@@ -503,6 +538,7 @@ def main():
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 
     sql_clauses = generate_sql(keys, tree)
+
     uniques = sql_clauses["uniques"]
     sql = serialize_sql(sql_clauses, args.limit)
 
