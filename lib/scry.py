@@ -553,4 +553,5 @@ def main():
     print_results(results)
 
 
-main()
+if __name__ == "__main__":
+    main()
