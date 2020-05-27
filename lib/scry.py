@@ -251,6 +251,7 @@ class buildTree(lark.Visitor):
                 return tree
             (t, *rprefix) = prefix
             ensure_exists(tree, "children", t, {})
+            self._handle_table_node_mapping(tree, t)
             return findPrefix(tree["children"][t], rprefix)
 
         def addConstraint(tree, suffix):
