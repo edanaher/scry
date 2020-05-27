@@ -232,7 +232,7 @@ class buildTree(lark.Visitor):
         if tree.children[0].data == "condition_path":
             prefix, suffix = tree.children[0].children
             schema, prefix_tables, _ = self._split_path(prefix)
-            _, suffix_tables, column = self._split_path(suffix)
+            _, suffix_tables, [column] = self._split_path(suffix)
         else: # full_path
             prefix, suffix = tree.children[0].children
             print(f"prefix/suffix: {prefix}/{suffix}")
@@ -269,7 +269,6 @@ class buildTree(lark.Visitor):
         if not schema and prefix.children and first_name in self.table_to_node:
             query_root = self.table_to_node[first_name]
         else:
-            print("Doesn't exist")
             ensure_exists(self.trees, schema, {})
             query_root = self.trees[schema]
 
