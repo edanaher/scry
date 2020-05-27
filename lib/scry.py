@@ -197,7 +197,7 @@ class buildTree(lark.Visitor):
 
         # Should this just replace the *, and keep duplicated fields?
         if "*" in columns:
-            columns = self.table_columns[tables[-1]]
+            columns = self.table_columns[tables[-1][0]]
 
 
         return (explicit_schema, tables, columns)
