@@ -218,12 +218,21 @@ class buildTree(lark.Visitor):
         else:
             self.table_to_node[table] = tree
 
+    def _find_prefix(self, tree, prefix):
+        if prefix == []:
+            return tree
+        ((table, alias), *rprefix) = prefix
+        ensure_exists(tree, "children", {})
+        self._handle_table_node_mapping(tree, alias)
+        ensure_exists(tree, "children", alias, {})
+        tree["children"][alias]["table"] = table
+        return self._find_prefix(tree["children"][alias], rprefix)
+
     def query_path(self, tree):
         schema, tables, columns = self._split_path(tree)
-        print("schema: ", schema)
-        print("tables: ", tables)
 
 
+        # TODO: use _find_prefix instead of duplicating logic here.
         def updateTree(tree, tables, columns):
             if tables == []:
                 ensure_exists(tree, "columns", [])
@@ -258,7 +267,6 @@ class buildTree(lark.Visitor):
             _, suffix_tables, [column] = self._split_path(suffix)
         else: # full_path
             prefix, suffix = tree.children[0].children
-            print(f"prefix/suffix: {prefix}/{suffix}")
             schema, prefix_tables, _ = self._split_path(prefix)
             column = suffix.children[0].value
 
@@ -269,22 +277,15 @@ class buildTree(lark.Visitor):
         if value[0] == '"' and value[-1] == '"':
             value = f"'{value[1:-1]}'"
 
-        def findPrefix(tree, prefix):
-            if prefix == []:
-                return tree
-            (t, *rprefix) = prefix
-            ensure_exists(tree, "children", t, {})
-            self._handle_table_node_mapping(tree, t)
-            return findPrefix(tree["children"][t], rprefix)
-
         def addConstraint(tree, suffix):
             if suffix == []:
                 ensure_exists(tree, "conditions", [])
                 tree["conditions"].append((column, op, value))
                 return
-            s, *rsuffix = suffix
-            ensure_exists(tree, "children", s, {})
-            addConstraint(tree["children"][s], rsuffix)
+            (table, alias), *rsuffix = suffix
+            ensure_exists(tree, "children", alias, {})
+            tree["children"][alias]["table"] = table
+            addConstraint(tree["children"][alias], rsuffix)
 
 
         # If the table's already in the tree, merge it in there instead of
@@ -296,15 +297,16 @@ class buildTree(lark.Visitor):
             ensure_exists(self.trees, schema, {})
             query_root = self.trees[schema]
 
-        prefixNode = findPrefix(query_root, prefix_tables)
+        prefixNode = self._find_prefix(query_root, prefix_tables)
 
         if suffix_tables == []:
             ensure_exists(prefixNode, "conditions", "conditions", [])
             prefixNode["conditions"]["conditions"].append((column, op, value))
         else:
-            t, *ts = suffix_tables
-            ensure_exists(prefixNode, "conditions", "children", t, {})
-            addConstraint(prefixNode["conditions"]["children"][t], ts)
+            (t, a), *ts = suffix_tables
+            ensure_exists(prefixNode, "conditions", "children", a, {})
+            prefixNode["conditions"]["children"][a]["table"] = t
+            addConstraint(prefixNode["conditions"]["children"][a], ts)
 
 
 
@@ -360,21 +362,21 @@ def merge_clauses(dst, src):
         dst[k] += vs
 
 def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None, lastTable=None, path=None):
-    print(f"generating for table@alias: {table}@{alias}, last is {lastTable}@{lastAlias}")
-    def generate_condition_subquery(baseTable, tree):
-        def subcondition_sql(tree, lastAlias):
+    def generate_condition_subquery(baseAlias, baseTable, tree):
+        def subcondition_sql(tree, lastTable, lastAlias):
             clauses = {"joins": [], "wheres": []}
             for a, subTree in tree.get("children", {}).items():
                 t = subTree["table"]
                 clauses["joins"].append(join_condition(keys["foreign"], schema, lastTable, t, lastAlias, a))
-                subclauses = subcondition_sql(subTree, t)
+                subclauses = subcondition_sql(subTree, t, a)
                 merge_clauses(clauses, subclauses)
             for c in tree.get("conditions", []):
                 col, op, value = c
-                clauses["wheres"].append(f"{schema}.{lastAlias}.{col} {op} {value}")
+                query_name = lastAlias if lastAlias != lastTable else schema + "." + table
+                clauses["wheres"].append(f"{query_name}.{col} {op} {value}")
             return clauses
 
-        clauses = subcondition_sql(tree, baseTable)
+        clauses = subcondition_sql(tree, baseTable, baseAlias)
         joins_string = schema + "." + table + " " + " ".join(clauses["joins"])
         wheres_string = " AND ".join(clauses["wheres"])
         sql = f"{schema}.{table}.id IN (SELECT {schema}.{table}.id FROM {joins_string} WHERE {wheres_string})"
@@ -402,9 +404,10 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
     if "conditions" in tree:
         for c in tree["conditions"].get("conditions", []):
             col, op, value = c
-            clauses["wheres"].append(f"{schema}.{table}.{col} {op} {value}")
+            query_name = alias if alias != table else schema + "." + table
+            clauses["wheres"].append(f"{query_name}.{col} {op} {value}")
         if "children" in tree["conditions"]:
-            clauses["wheres"].append(generate_condition_subquery(table, tree["conditions"]))
+            clauses["wheres"].append(generate_condition_subquery(alias, table, tree["conditions"]))
 
     if not lastTable:
         if table in keys["unique"][schema]:
