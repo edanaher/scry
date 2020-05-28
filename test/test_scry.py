@@ -45,9 +45,25 @@ test_instances = [
         {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
         ['- scry.authors.name: J.R.R Tolkien', '- scry.authors.name: J.K. Rowling', '- scry.authors.name: Ted Chiang']
         ),
-
+   Instance(
+        'Simple test with two columns',
+        'scry.books.title scry.books.year',
+        {'scry': {'children': {'books': {'table': 'books', 'columns': ['title', 'year']}}}},
+        {'selects': [('scry.books.title', 'scry.books.title'), ('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': [], 'uniques': [('scry.books.id', 'scry.books.id')]},
+        'SELECT scry.books.id, scry.books.title, scry.books.year FROM scry.books  LIMIT 100',
+        {'scry': {((None,), (None,)): {'books': {((('title', 'Fellowship of the Rings'), ('year', 1954)), (('id', 1),)): {}, ((('title', 'The Two Towers'), ('year', 1954)), (('id', 2),)): {}, ((('title', 'Return of the King'), ('year', 1955)), (('id', 3),)): {}, ((('title', "Harry Potter and the Philosopher's Stone"), ('year', 1997)), (('id', 4),)): {}, ((('title', 'Harry Potter and the Prisoner of Azkaban'), ('year', 1999)), (('id', 5),)): {}, ((('title', 'Exhalation'), ('year', 2019)), (('id', 6),)): {}, ((('title', 'Beowolf'), ('year', 2016)), (('id', 7),)): {}}}}},
+        ['- scry.books.title: Fellowship of the Rings', '  scry.books.year: 1954', '- scry.books.title: The Two Towers', '  scry.books.year: 1954', '- scry.books.title: Return of the King', '  scry.books.year: 1955', "- scry.books.title: Harry Potter and the Philosopher's Stone", '  scry.books.year: 1997', '- scry.books.title: Harry Potter and the Prisoner of Azkaban', '  scry.books.year: 1999', '- scry.books.title: Exhalation', '  scry.books.year: 2019', '- scry.books.title: Beowolf', '  scry.books.year: 2016']
+        ),
+   Instance(
+        'Simple test with two comma-separated columns',
+        'scry.books.title,year',
+        {'scry': {'children': {'books': {'table': 'books', 'columns': ['title', 'year']}}}},
+        {'selects': [('scry.books.title', 'scry.books.title'), ('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': [], 'uniques': [('scry.books.id', 'scry.books.id')]},
+        'SELECT scry.books.id, scry.books.title, scry.books.year FROM scry.books  LIMIT 100',
+        {'scry': {((None,), (None,)): {'books': {((('title', 'Fellowship of the Rings'), ('year', 1954)), (('id', 1),)): {}, ((('title', 'The Two Towers'), ('year', 1954)), (('id', 2),)): {}, ((('title', 'Return of the King'), ('year', 1955)), (('id', 3),)): {}, ((('title', "Harry Potter and the Philosopher's Stone"), ('year', 1997)), (('id', 4),)): {}, ((('title', 'Harry Potter and the Prisoner of Azkaban'), ('year', 1999)), (('id', 5),)): {}, ((('title', 'Exhalation'), ('year', 2019)), (('id', 6),)): {}, ((('title', 'Beowolf'), ('year', 2016)), (('id', 7),)): {}}}}},
+        ['- scry.books.title: Fellowship of the Rings', '  scry.books.year: 1954', '- scry.books.title: The Two Towers', '  scry.books.year: 1954', '- scry.books.title: Return of the King', '  scry.books.year: 1955', "- scry.books.title: Harry Potter and the Philosopher's Stone", '  scry.books.year: 1997', '- scry.books.title: Harry Potter and the Prisoner of Azkaban', '  scry.books.year: 1999', '- scry.books.title: Exhalation', '  scry.books.year: 2019', '- scry.books.title: Beowolf', '  scry.books.year: 2016']
+        ),
     # End of instances
-
 ]
 
 def test_scry():
