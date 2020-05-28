@@ -26,6 +26,7 @@ def test_foreign_keys():
 
 @dataclass
 class Instance:
+    name: str
     query: str
     tree: str
     sql_clauses: str
@@ -36,6 +37,7 @@ class Instance:
 
 test_instances = [
     Instance(
+        "Simple test of table and column",
         "scry.authors.name",
         {'scry': {'children': {'authors': {'columns': ['name'], 'table': 'authors'}}}},
         {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': [], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
