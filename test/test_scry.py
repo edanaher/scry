@@ -31,6 +31,7 @@ class Instance:
     sql_clauses: str
     sql: str
     results : str
+    output : [str]
 
 
 test_instances = [
@@ -39,8 +40,11 @@ test_instances = [
         {'scry': {'children': {'authors': {'columns': ['name'], 'table': 'authors'}}}},
         {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': [], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
         "SELECT scry.authors.id, scry.authors.name FROM scry.authors  LIMIT 100",
-        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}})
+        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
+        ['- scry.authors.name: J.R.R Tolkien', '- scry.authors.name: J.K. Rowling', '- scry.authors.name: Ted Chiang']
+        ),
 
+    # End of instances
 
 ]
 
@@ -58,7 +62,6 @@ def test_scry():
         assert tree == instance.tree
 
         sql_clauses = scry.generate_sql(keys, tree)
-        print(sql_clauses)
         assert sql_clauses == instance.sql_clauses
 
         sql = scry.serialize_sql(sql_clauses, 100)
@@ -66,6 +69,8 @@ def test_scry():
         cur.execute(sql)
         results = scry.reshape_results(cur, sql_clauses)
         assert results == instance.results
+        output = scry.format_results(results)
+        assert output == instance.output
 
     pass
 

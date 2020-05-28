@@ -510,20 +510,26 @@ def reshape_results(cur, sql_clauses):
 
     return tree
 
-def print_results(results, path="", indent=""):
+def format_results(results, path="", indent=""):
+    output = []
+
     def print_fields(table, fields):
+        output = []
         k, v = fields[0]
-        print(f"{indent}- {path}{table}.{k}: {v}")
+        output.append(f"{indent}- {path}{table}.{k}: {v}")
         for k, v in fields[1:]:
-            print(f"{indent}  {path}{table}.{k}: {v}")
+            output.append(f"{indent}  {path}{table}.{k}: {v}")
+        return output
 
     for t, subTree in results.items():
         for (display, hidden), nextTree in subTree.items():
             if display != (None,):
-                print_fields(t, display)
-                print_results(nextTree, "", indent + "  ")
+                output += print_fields(t, display)
+                output += format_results(nextTree, "", indent + "  ")
             else:
-                print_results(nextTree, path + t + ".", indent)
+                output += format_results(nextTree, path + t + ".", indent)
+
+    return output
 
 def main():
     args = parseargs()
@@ -550,7 +556,9 @@ def main():
 
     results = reshape_results(cur, sql_clauses)
 
-    print_results(results)
+    output = format_results(results)
+    print(output)
+    print("\n".join(output))
 
 
 if __name__ == "__main__":
