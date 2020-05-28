@@ -1,4 +1,5 @@
 import psycopg2
+import pytest
 from dataclasses import dataclass
 
 from lib import scry
@@ -37,7 +38,7 @@ class Instance:
 
 test_instances = [
     Instance(
-        "Simple test of table and column",
+        "simple test of table and column",
         "scry.authors.name",
         {'scry': {'children': {'authors': {'columns': ['name'], 'table': 'authors'}}}},
         {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': [], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
@@ -46,7 +47,7 @@ test_instances = [
         ['- scry.authors.name: J.R.R Tolkien', '- scry.authors.name: J.K. Rowling', '- scry.authors.name: Ted Chiang']
         ),
    Instance(
-        'Simple test with two columns',
+        'simple test with two columns',
         'scry.books.title scry.books.year',
         {'scry': {'children': {'books': {'table': 'books', 'columns': ['title', 'year']}}}},
         {'selects': [('scry.books.title', 'scry.books.title'), ('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': [], 'uniques': [('scry.books.id', 'scry.books.id')]},
@@ -55,7 +56,7 @@ test_instances = [
         ['- scry.books.title: Fellowship of the Rings', '  scry.books.year: 1954', '- scry.books.title: The Two Towers', '  scry.books.year: 1954', '- scry.books.title: Return of the King', '  scry.books.year: 1955', "- scry.books.title: Harry Potter and the Philosopher's Stone", '  scry.books.year: 1997', '- scry.books.title: Harry Potter and the Prisoner of Azkaban', '  scry.books.year: 1999', '- scry.books.title: Exhalation', '  scry.books.year: 2019', '- scry.books.title: Beowolf', '  scry.books.year: 2016']
         ),
    Instance(
-        'Simple test with two comma-separated columns',
+        'simple test with two comma-separated columns',
         'scry.books.title,year',
         {'scry': {'children': {'books': {'table': 'books', 'columns': ['title', 'year']}}}},
         {'selects': [('scry.books.title', 'scry.books.title'), ('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': [], 'uniques': [('scry.books.id', 'scry.books.id')]},
@@ -66,7 +67,7 @@ test_instances = [
     # End of instances
 ]
 
-def test_scry():
+def run_test(instance):
     db = psycopg2.connect("")
     cur = db.cursor()
 
@@ -75,20 +76,23 @@ def test_scry():
     unique_keys = scry.get_unique_keys(cur)
     keys = {"unique": unique_keys, "foreign": foreign_keys}
 
-    for instance in test_instances:
-        tree = scry.parse(table_info, foreign_keys, instance.query)
-        assert tree == instance.tree
+    tree = scry.parse(table_info, foreign_keys, instance.query)
+    assert tree == instance.tree
 
-        sql_clauses = scry.generate_sql(keys, tree)
-        assert sql_clauses == instance.sql_clauses
+    sql_clauses = scry.generate_sql(keys, tree)
+    assert sql_clauses == instance.sql_clauses
 
-        sql = scry.serialize_sql(sql_clauses, 100)
-        assert(sql == instance.sql)
-        cur.execute(sql)
-        results = scry.reshape_results(cur, sql_clauses)
-        assert results == instance.results
-        output = scry.format_results(results)
-        assert output == instance.output
+    sql = scry.serialize_sql(sql_clauses, 100)
+    assert(sql == instance.sql)
+    cur.execute(sql)
 
-    pass
+    results = scry.reshape_results(cur, sql_clauses)
+    assert results == instance.results
+
+    output = scry.format_results(results)
+    assert output == instance.output
+
+@pytest.mark.parametrize("instance", test_instances)
+def test_scry(instance):
+    run_test(instance)
 
