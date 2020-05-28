@@ -49,18 +49,18 @@ CREATE TABLE favorites (
 
 
 INSERT INTO authors (id, name) VALUES
-  (1, 'J.R.R Tokien'),
+  (1, 'J.R.R Tolkien'),
   (2, 'J.K. Rowling'),
-  (3, 'Ted Chaing');
+  (3, 'Ted Chiang');
 
 INSERT INTO books (id, title, year, author_id) VALUES
-  (1, 'Fellowship of the Rings', 1950, 1),
-  (2, 'The Two Towers', 1953, 1),
-  (3, 'Return of the King', 1956, 1),
-  (4, 'Harry Potter and the Philosopher''s Stone', 1994, 2),
-  (5, 'Harry Potter and the Prisoner of Azkaban', 1996, 2),
+  (1, 'Fellowship of the Rings', 1954, 1),
+  (2, 'The Two Towers', 1954, 1),
+  (3, 'Return of the King', 1955, 1),
+  (4, 'Harry Potter and the Philosopher''s Stone', 1997, 2),
+  (5, 'Harry Potter and the Prisoner of Azkaban', 1999, 2),
 
-  (6, 'Exhalation', 2017, 3),
+  (6, 'Exhalation', 2019, 3),
 
   (7, 'Beowolf', 2016, 1);
 

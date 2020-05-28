@@ -390,7 +390,7 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
         return clauses
 
     if not table:
-        for a, subTree in tree["children"].items():
+        for a, subTree in tree.get("children", {}).items():
             t = subTree["table"]
             subclauses = generate_sql(keys, subTree, schema, t, a, None, None, path + "." + a)
             merge_clauses(clauses, subclauses)
