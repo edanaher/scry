@@ -159,8 +159,13 @@ class buildTree(lark.Visitor):
             explicit_schema = None
             children = tree.children
 
+        # Handle a terminator
+        terminated = False
+        if children[-1].data == "terminator":
+            terminated = True
+            children = children[:-1]
+
         (first_table, first_alias) = self._table_alias(children[0])
-        print("first_table is", repr(first_table))
         if first_table not in self.table_columns:
             raise Exception("Unknown table: " + first_table)
         tables = [(first_table, first_alias)]
@@ -199,6 +204,8 @@ class buildTree(lark.Visitor):
         if "*" in columns:
             columns = self.table_columns[tables[-1][0]]
 
+        if terminated:
+            columns = []
 
         return (explicit_schema, tables, columns)
 
@@ -255,10 +262,6 @@ class buildTree(lark.Visitor):
             query_root = self.trees[schema]
 
         updateTree(query_root, tables, columns)
-        for k, t in self.trees.items():
-            print(k)
-            print_tree(t)
-        print("="*40)
 
     def condition(self, tree):
         if tree.children[0].data == "condition_path":
@@ -316,10 +319,10 @@ def parse(table_info, foreign_keys, query):
 
     schemas, tables, columns, table_columns = table_info
     p = Lark(f"""
-        start: component (" " component)*
+        start: component (WS+ component)*
         component: query_path | condition
 
-        query_path: path_elem ("." path_elem)* ("." columns)?
+        query_path: path_elem ("." path_elem)* ("." columns)? terminator?
 
         condition: (condition_path | condition_full_path) comparison_op VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
@@ -331,6 +334,7 @@ def parse(table_info, foreign_keys, query):
         path_elem: COMPONENT ("@" NAME)?
         columns: COLUMN ("," COLUMN)*
         column: COLUMN
+        terminator: "%"
         COMPONENT: NAME
         COLUMN: NAME | "*"
         VALUE: ESCAPED_STRING | SIGNED_NUMBER
@@ -546,6 +550,8 @@ def main():
     unique_keys = get_unique_keys(cur)
     query = args.command
     tree = parse(table_info, foreign_keys, query)
+    print_tree(tree)
+    print("="*60)
 
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 

@@ -172,6 +172,15 @@ test_instances = [
         {'scry': {((None,), (None,)): {'a': {((None,), (('id', 1),)): {'books': {((('title', 'Beowolf'),), (('id', 7),)): {}, ((('title', 'Return of the King'),), (('id', 3),)): {}, ((('title', 'The Two Towers'),), (('id', 2),)): {}, ((('title', 'Fellowship of the Rings'),), (('id', 1),)): {}}}}}}},
         ['- scry.a.books.title: Beowolf', '- scry.a.books.title: Return of the King', '- scry.a.books.title: The Two Towers', '- scry.a.books.title: Fellowship of the Rings']
         ),
+   Instance(
+        'Terminator to select no fields',
+        'scry.authors@a% a.name',
+        {'scry': {'children': {'a': {'table': 'authors', 'columns': ['name']}}}},
+        {'selects': [('a.name', 'scry.a.name')], 'joins': ['scry.authors AS a'], 'wheres': [], 'uniques': [('a.id', 'scry.a.id')]},
+        'SELECT a.id, a.name FROM scry.authors AS a  LIMIT 100',
+        {'scry': {((None,), (None,)): {'a': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
+        ['- scry.a.name: J.R.R. Tolkien', '- scry.a.name: J.K. Rowling', '- scry.a.name: Ted Chiang']
+        ),
     # End of instances
 ]
 
