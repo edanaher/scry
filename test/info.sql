@@ -49,7 +49,7 @@ CREATE TABLE favorites (
 
 
 INSERT INTO authors (id, name) VALUES
-  (1, 'J.R.R Tolkien'),
+  (1, 'J.R.R. Tolkien'),
   (2, 'J.K. Rowling'),
   (3, 'Ted Chiang');
 

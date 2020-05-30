@@ -7,7 +7,7 @@ from lark import Lark
 import lark
 import sys
 
-default_schema = "public"
+default_schema = "scry"
 
 def get_table_info(cur):
     schemas = set()
@@ -170,7 +170,7 @@ class buildTree(lark.Visitor):
             if table not in self.table_columns:
                 raise Exception("Unknown table: " + table)
             if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
-                raise Exception(f"No known join: {tables[-1]} to {table}")
+                raise Exception(f"No known join: {schema}.{tables[-1][0]} to {table}")
             tables.append((table, alias))
 
         if children[-1].data == "columns" and len(children[-1].children) > 1:
@@ -372,14 +372,17 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
                 merge_clauses(clauses, subclauses)
             for c in tree.get("conditions", []):
                 col, op, value = c
-                query_name = lastAlias if lastAlias != lastTable else schema + "." + table
+                query_name = lastAlias if lastAlias != lastTable else schema + "." + lastTable
+                print("Adding query on ", query_name, ".", col)
                 clauses["wheres"].append(f"{query_name}.{col} {op} {value}")
             return clauses
 
         clauses = subcondition_sql(tree, baseTable, baseAlias)
         joins_string = schema + "." + table + " " + " ".join(clauses["joins"])
         wheres_string = " AND ".join(clauses["wheres"])
-        sql = f"{schema}.{table}.id IN (SELECT {schema}.{table}.id FROM {joins_string} WHERE {wheres_string})"
+        query_name = baseAlias if baseAlias != lastTable else schema + "." + baseTable
+        # TODO: Handle non-id keys
+        sql = f"{query_name}.id IN (SELECT {schema}.{table}.id FROM {joins_string} WHERE {wheres_string})"
         return sql
 
     clauses = { "selects": [], "joins": [], "wheres": [], "uniques": [] }
@@ -454,7 +457,7 @@ def parseargs():
     parser.add_argument("-c", "--command", help="command to run")
     parser.add_argument("-d", "--database", help="database to connect to")
     parser.add_argument("-l", "--limit", help="row limit (0 for no limit)", default=100, type=int)
-    parser.add_argument("-s", "--schema", help="default schema", default="public")
+    parser.add_argument("-s", "--schema", help="default schema", default="scry")
     return parser.parse_args()
 
 def shared_prefix(l1, l2):
