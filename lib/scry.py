@@ -6,6 +6,7 @@ import psycopg2
 from lark import Lark
 import lark
 import sys
+from prompt_toolkit import prompt
 
 def get_table_info(cur):
     schemas = set()
@@ -546,6 +547,30 @@ def format_results(results, path="", indent=""):
 
     return output
 
+def run_command(cur, table_info, keys, query, limit=100):
+    tree = parse(table_info, keys["foreign"], query)
+    print_tree(tree)
+    print("="*60)
+
+
+    sql_clauses = generate_sql(keys, tree)
+
+    uniques = sql_clauses["uniques"]
+    sql = serialize_sql(sql_clauses, limit)
+
+    print(sql)
+    cur.execute(sql)
+
+    results = reshape_results(cur, sql_clauses)
+
+    return format_results(results)
+
+def repl(cur, table_info, keys):
+    while True:
+        res = prompt("> ")
+        output = run_command(cur, table_info, keys, res)
+        print("\n".join(output))
+
 def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
@@ -554,26 +579,12 @@ def main():
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
     unique_keys = get_unique_keys(cur)
-    query = args.command
-    tree = parse(table_info, foreign_keys, query)
-    print_tree(tree)
-    print("="*60)
-
     keys = { "unique": unique_keys, "foreign": foreign_keys }
-
-    sql_clauses = generate_sql(keys, tree)
-
-    uniques = sql_clauses["uniques"]
-    sql = serialize_sql(sql_clauses, args.limit)
-
-    print(sql)
-    cur.execute(sql)
-
-    results = reshape_results(cur, sql_clauses)
-
-    output = format_results(results)
-    print(output)
-    print("\n".join(output))
+    if args.command:
+        output = run_command(cur, table_info, keys, args.command, args.limit)
+        print("\n".join(output))
+    else:
+        repl(cur, table_info, keys)
 
 
 if __name__ == "__main__":
