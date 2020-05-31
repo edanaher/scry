@@ -7,8 +7,6 @@ from lark import Lark
 import lark
 import sys
 
-default_schema = "scry"
-
 def get_table_info(cur):
     schemas = set()
     tables = defaultdict(set)
@@ -427,7 +425,7 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
             clauses["wheres"].append(generate_condition_subquery(alias, table, tree["conditions"]))
 
     if not lastTable:
-        if table in keys["unique"][schema]:
+        if table in keys["unique"].get(schema, {}):
             query_name = alias if alias != table else schema + "." + table
             cols = keys["unique"][schema][table]["columns"]
             clauses["uniques"] += [(query_name + "." + c, path + "." + c) for c in cols]
@@ -552,8 +550,6 @@ def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
     cur = db.cursor()
-    global default_schema
-    default_schema = args.schema
 
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
