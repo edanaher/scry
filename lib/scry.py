@@ -575,12 +575,23 @@ class ScryCompleter(Completer):
         self.tables = tables
         self.columns = columns
         self.table_columns = table_columns
-        print(self.tables.keys())
 
     def get_completions(self, doc, event):
         word = doc.get_word_before_cursor()
-        candidates = self.tables.keys()
+        if word == ".":
+            word = ""
 
+        table_candidates = list(self.tables.keys())
+
+
+        component = doc.get_word_before_cursor("\S*")
+        column_candidates = []
+        parts = component.split(".")
+        if len(parts) > 1:
+            prev_part = parts[-2]
+            column_candidates = self.table_columns.get(prev_part, [])
+
+        candidates = table_candidates + column_candidates
         matches = [c for c in candidates if c.startswith(word)]
         return [Completion(c, -len(word)) for c in matches]
 
