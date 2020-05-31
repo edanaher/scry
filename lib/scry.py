@@ -9,6 +9,7 @@ import os
 import sys
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
+from prompt_toolkit.completion import Completer, Completion
 
 def get_table_info(cur):
     schemas = set()
@@ -567,8 +568,26 @@ def run_command(cur, table_info, keys, query, limit=100):
 
     return format_results(results)
 
+class ScryCompleter(Completer):
+    def __init__(self, table_info):
+        schemas, tables, columns, table_columns = table_info
+        self.schemas = schemas
+        self.tables = tables
+        self.columns = columns
+        self.table_columns = table_columns
+        print(self.tables.keys())
+
+    def get_completions(self, doc, event):
+        word = doc.get_word_before_cursor()
+        candidates = self.tables.keys()
+
+        matches = [c for c in candidates if c.startswith(word)]
+        return [Completion(c, -len(word)) for c in matches]
+
 def repl(cur, table_info, keys):
-    session = PromptSession(history=FileHistory(os.getenv("HOME") + "/.scry/history"))
+    session = PromptSession(
+            history=FileHistory(os.getenv("HOME") + "/.scry/history"),
+            completer=ScryCompleter(table_info))
     while True:
         res = session.prompt("> ")
         output = run_command(cur, table_info, keys, res)
