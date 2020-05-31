@@ -11,7 +11,7 @@ default_schema = "scry"
 
 def get_table_info(cur):
     schemas = set()
-    tables = set()
+    tables = defaultdict(set)
     columns = set()
     query = """SELECT
         table_schema,
@@ -26,10 +26,10 @@ def get_table_info(cur):
     for row in cur:
         s, t, c = row
         schemas.add(s)
-        tables.add(t)
+        tables[t].add(s)
         columns.add(c)
         table_columns[t].append(c)
-    return (list(schemas), list(tables), list(columns), table_columns)
+    return (list(schemas), {t: list(ss) for t, ss in tables.items()}, list(columns), table_columns)
 
 def get_unique_keys(cur):
     query =  """SELECT
@@ -123,15 +123,16 @@ def ensure_exists(dict, *args):
 
 
 class buildTree(lark.Visitor):
-    def __init__(self, table_columns, foreign_keys, schemas):
+    def __init__(self, tables, table_columns, foreign_keys, schemas):
         self.trees = {}
+        self.tables = tables
         self.table_columns = table_columns
         self.foreign_keys = foreign_keys
         self.schemas = schemas
         self.table_to_node = {}
         self.aliases = {}
 
-    def _table_alias(self, tree):
+    def _table_alias(self, schema, tree):
         table = tree.children[0].value
         if len(tree.children) > 1:
             # An alias; save it.
@@ -140,23 +141,32 @@ class buildTree(lark.Visitor):
             if table in self.aliases:
                 # If it's just an alias, pull it out.
                 alias = table
-                table = self.aliases[alias]
+                schema, table = self.aliases[alias]
             else:
                 # If it's just a table, it aliases to itself.
                 alias = table
-        if alias in self.aliases and self.aliases[alias] != table:
+        if alias in self.aliases and self.aliases[alias] != (schema, table):
             raise Exception(f"Alias conflict: {alias} used for both {self.aliases[alias]} and {table}")
-        self.aliases[alias] = table
-        return (table, alias)
+        if schema is None:
+            raise Exception(f"Unable to figure out schema for {table}@{alias}")
+        self.aliases[alias] = (schema, table)
+        return (schema, table, alias)
 
     def _split_path(self, tree):
-        if tree.children[0].children[0].value in self.schemas:
-            schema = tree.children[0].children[0].value
-            explicit_schema = schema
+        first_name = tree.children[0].children[0].value
+        if first_name in self.schemas:
+            schema = first_name
             children = tree.children[1:]
         else:
-            schema = default_schema
-            explicit_schema = None
+            if first_name not in self.aliases:
+                if first_name not in self.tables:
+                    raise Exception(f"Unknown table: {first_name}")
+                if len(self.tables[first_name]) > 1:
+                    raise Exception(f"Ambiguous table {first_name} in schemas {', '.join(self.tables[first_name])}")
+                schema = self.tables[first_name][0]
+                print(f"Schema came out as {schema}")
+            else:
+                schema = None
             children = tree.children
 
         # Handle a terminator
@@ -165,13 +175,13 @@ class buildTree(lark.Visitor):
             terminated = True
             children = children[:-1]
 
-        (first_table, first_alias) = self._table_alias(children[0])
+        (schema, first_table, first_alias) = self._table_alias(schema, children[0])
         if first_table not in self.table_columns:
             raise Exception("Unknown table: " + first_table)
         tables = [(first_table, first_alias)]
 
         for child in children[1:-1]:
-            (table, alias) = self._table_alias(child)
+            (schema, table, alias) = self._table_alias(schema, child)
             if table not in self.table_columns:
                 raise Exception("Unknown table: " + table)
             if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
@@ -196,7 +206,7 @@ class buildTree(lark.Visitor):
                     raise Exception("Unknown table or column: " + name)
                 if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
                     raise Exception(f"No known join: {tables[-1]} to {name}")
-                (table, alias) = self._table_alias(children[-1])
+                (schema, table, alias) = self._table_alias(schema, children[-1])
                 tables.append((table, alias))
                 columns = ["*"]
 
@@ -207,7 +217,7 @@ class buildTree(lark.Visitor):
         if terminated:
             columns = []
 
-        return (explicit_schema, tables, columns)
+        return (schema, tables, columns)
 
     def _handle_table_node_mapping(self, tree, table):
         if table in self.table_to_node:
@@ -346,7 +356,7 @@ def parse(table_info, foreign_keys, query):
         %ignore WS
     """)
     parsed = p.parse(query)
-    t = buildTree(table_columns, foreign_keys, schemas)
+    t = buildTree(tables, table_columns, foreign_keys, schemas)
     t.visit(parsed)
     return t.trees
 

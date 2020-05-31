@@ -181,6 +181,24 @@ test_instances = [
         {'scry': {((None,), (None,)): {'a': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
         ['- scry.a.name: J.R.R. Tolkien', '- scry.a.name: J.K. Rowling', '- scry.a.name: Ted Chiang']
         ),
+   Instance(
+        'Terminator to select no fields without schema',
+        'authors@a% a.name',
+        {'scry': {'children': {'a': {'table': 'authors', 'columns': ['name']}}}},
+        {'selects': [('a.name', 'scry.a.name')], 'joins': ['scry.authors AS a'], 'wheres': [], 'uniques': [('a.id', 'scry.a.id')]},
+        'SELECT a.id, a.name FROM scry.authors AS a  LIMIT 100',
+        {'scry': {((None,), (None,)): {'a': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
+        ['- scry.a.name: J.R.R. Tolkien', '- scry.a.name: J.K. Rowling', '- scry.a.name: Ted Chiang']
+        ),
+   Instance(
+        'simple conditional without schema',
+        'books.year books.title = "Fellowship of the Rings"',
+        {'scry': {'children': {'books': {'table': 'books', 'columns': ['year'], 'conditions': {'conditions': [('title', '=', "'Fellowship of the Rings'")]}}}}},
+        {'selects': [('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': ["scry.books.title = 'Fellowship of the Rings'"], 'uniques': [('scry.books.id', 'scry.books.id')]},
+        "SELECT scry.books.id, scry.books.year FROM scry.books  WHERE scry.books.title = 'Fellowship of the Rings' LIMIT 100",
+        {'scry': {((None,), (None,)): {'books': {((('year', 1954),), (('id', 1),)): {}}}}},
+        ['- scry.books.year: 1954']
+        ),
     # End of instances
 ]
 
