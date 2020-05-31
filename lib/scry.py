@@ -5,8 +5,10 @@ from collections import defaultdict
 import psycopg2
 from lark import Lark
 import lark
+import os
 import sys
-from prompt_toolkit import prompt
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
 
 def get_table_info(cur):
     schemas = set()
@@ -566,8 +568,9 @@ def run_command(cur, table_info, keys, query, limit=100):
     return format_results(results)
 
 def repl(cur, table_info, keys):
+    session = PromptSession(history=FileHistory(os.getenv("HOME") + "/.scry/history"))
     while True:
-        res = prompt("> ")
+        res = session.prompt("> ")
         output = run_command(cur, table_info, keys, res)
         print("\n".join(output))
 
