@@ -191,3 +191,4 @@ TODO
 - list tables in schema
 - Fuller tab completion in REPL (aliases, schemas)
 - schema aliases
+- generally squash the bugs and clean some things up.
