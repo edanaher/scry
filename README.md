@@ -44,9 +44,11 @@ The schema is... currently in flux.  Right now it does nothing, but likely will 
 
 ### Queries
 
-A scry query consists of a number of components; each can select a set of columns to return, add a condition to be applied to the return set, add an alias to a table, or more than one of the above.
+A scry query consists of a number of components; each can select a set of columns to return, (possibly joined through multiple tables), add a condition to be applied to the return set, add an alias to a table, or more than one of the above.
 
 In general, tables are chained-together in an object-like style, and all components are merged together into one giant query (helpfully printed before the results.)  The results are also printed in a tree-like structure (by default, and always for now).  For example, using the test schema and data defined in test/info.sql:
+
+The joins are figured out automatically using foreign key constraints; if a table has a foreign key constraint to another table, it's assumed that that's how the two tables should be joined.
 
 ```
 > authors.name authors.books.title
@@ -93,7 +95,7 @@ T JOIN scry.authors ON scry.books.author_id = scry.authors.id  LIMIT 100
 
 Note that for each user, we join through multiple tables to get the title and publication year of their favorite books, as well as those books authors.  And If there is no favorite, we get None.  That seems like a bug.
 
-But you don't have to write out all of those tables every time; each table can only occur once in the query (unless aliased as described below), so just giving the unqualified table name will join in into the query at the appropraite point:
+But you don't have to write out all of those tables every time; each table can only occur once in the query (unless aliased as described below), so just giving the unqualified table name will join in into the query at the appropriate point:
 
 ```
 > users.name users.favorites.books.title,year books.authors.name
@@ -165,7 +167,7 @@ SELECT scry.authors.id, scry.books.id, scry.books.title FROM scry.authors LEFT J
 - scry.authors.books.title: Beowolf
 ```
 
-This finds authors that have a book named "Fellowship of the Rings", and then prints their books' titles.  Tables named after a colon are separately namespaced from the rest of the query.
+This condition can be read as "authors such that they join to a row of books with title 'Fellowship of the Rings'"; in other words, this finds authors that have a book named "Fellowship of the Rings", and then prints their books' titles.  Tables named after a colon are separately namespaced from the rest of the query.
 
 Note that without the colon, this restricts to only books that have that title, so only gives back the one book:
 
