@@ -1,0 +1,5 @@
+.venv
+build
+dist
+scry.egg-info
+__pycache__
