@@ -11,6 +11,9 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion
 
+class ScryException(Exception):
+    pass
+
 def get_table_info(cur):
     schemas = set()
     tables = defaultdict(set)
@@ -150,9 +153,9 @@ class buildTree(lark.Visitor):
                 # If it's just a table, it aliases to itself.
                 alias = table
         if alias in self.aliases and self.aliases[alias] != (schema, table):
-            raise Exception(f"Alias conflict: {alias} used for both {self.aliases[alias]} and {table}")
+            raise ScryException(f"Alias conflict: {alias} used for both {self.aliases[alias]} and {table}")
         if schema is None:
-            raise Exception(f"Unable to figure out schema for {table}@{alias}")
+            raise ScryException(f"Unable to figure out schema for {table}@{alias}")
         self.aliases[alias] = (schema, table)
         return (schema, table, alias)
 
@@ -164,9 +167,9 @@ class buildTree(lark.Visitor):
         else:
             if first_name not in self.aliases:
                 if first_name not in self.tables:
-                    raise Exception(f"Unknown table: {first_name}")
+                    raise ScryException(f"Unknown table: {first_name}")
                 if len(self.tables[first_name]) > 1:
-                    raise Exception(f"Ambiguous table {first_name} in schemas {', '.join(self.tables[first_name])}")
+                    raise ScryException(f"Ambiguous table {first_name} in schemas {', '.join(self.tables[first_name])}")
                 schema = self.tables[first_name][0]
             else:
                 schema = None
@@ -180,15 +183,15 @@ class buildTree(lark.Visitor):
 
         (schema, first_table, first_alias) = self._table_alias(schema, children[0])
         if first_table not in self.table_columns:
-            raise Exception("Unknown table: " + first_table)
+            raise ScryException("Unknown table: " + first_table)
         tables = [(first_table, first_alias)]
 
         for child in children[1:-1]:
             (schema, table, alias) = self._table_alias(schema, child)
             if table not in self.table_columns:
-                raise Exception("Unknown table: " + table)
+                raise ScryException("Unknown table: " + table)
             if schema not in self.foreign_keys.get(tables[-1][0], {}).get(schema, {}).get(table, {}):
-                raise Exception(f"No known join: {schema}.{tables[-1][0]} to {table}")
+                raise ScryException(f"No known join: {schema}.{tables[-1][0]} to {table}")
             tables.append((table, alias))
 
         if children[-1].data == "columns" and len(children[-1].children) > 1:
@@ -206,9 +209,9 @@ class buildTree(lark.Visitor):
             else:
                 # Assume it's a table
                 if name not in self.table_columns:
-                    raise Exception("Unknown table or column: " + name)
+                    raise ScryException("Unknown table or column: " + name)
                 if schema not in self.foreign_keys.get(tables[-1][0], {}).get(schema, {}).get(name, {}):
-                    raise Exception(f"No known join: {tables[-1][0]} to {name}")
+                    raise ScryException(f"No known join: {tables[-1][0]} to {name}")
                 (schema, table, alias) = self._table_alias(schema, children[-1])
                 tables.append((table, alias))
                 columns = ["*"]
@@ -228,7 +231,7 @@ class buildTree(lark.Visitor):
             if tree != existing:
                 # If the tree isn't a root, we have a problem.
                 if existing != self.trees[None]:
-                    raise Exception(f"Table {table} duplicated in tree!")
+                    raise ScryException(f"Table {table} duplicated in tree!")
 
                 # If the existing tree is a root, splice it in here.
                 tree["children"][table] = self.trees[None]["children"][table]
@@ -599,10 +602,18 @@ def repl(cur, table_info, keys):
     session = PromptSession(
             history=FileHistory(os.getenv("HOME") + "/.scry/history"),
             completer=ScryCompleter(table_info, keys["foreign"]))
-    while True:
-        res = session.prompt("> ")
-        output = run_command(cur, table_info, keys, res)
-        print("\n".join(output))
+    try:
+        while True:
+            command = session.prompt("> ")
+            if command in ["quit", "break", "bye"]:
+                break
+            try:
+                output = run_command(cur, table_info, keys, command)
+                print("\n".join(output))
+            except ScryException as e:
+                print(e)
+    except EOFError:
+        pass
 
 def main():
     args = parseargs()
