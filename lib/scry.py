@@ -99,14 +99,16 @@ def get_foreign_keys(cur):
           AND ccu.table_schema = tc.table_schema
     WHERE tc.constraint_type = 'FOREIGN KEY'"""
 
-    keys = defaultdict(dict)
+    keys = {}
     cur.execute(query)
     for row in cur:
         s1, t1, c1, s2, t2, c2 = row
         st1 = f"{s1}.{t1}"
         st2 = f"{s2}.{t2}"
-        keys[st1][st2] = (c1, c2)
-        keys[st2][st1] = (c2, c1)
+        ensure_exists(keys, t1, s1, t2, {})
+        keys[t1][s1][t2][s2] = (c1, c2)
+        ensure_exists(keys, t2, s2, t1, {})
+        keys[t2][s2][t1][s1] = (c2, c1)
     return keys
 
 # ensure_exists(dict, key1, key2, ..., keyn, default)
@@ -186,7 +188,7 @@ class buildTree(lark.Visitor):
             (schema, table, alias) = self._table_alias(schema, child)
             if table not in self.table_columns:
                 raise Exception("Unknown table: " + table)
-            if schema + "." + table not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
+            if schema not in self.foreign_keys.get(tables[-1][0], {}).get(schema, {}).get(table, {}):
                 raise Exception(f"No known join: {schema}.{tables[-1][0]} to {table}")
             tables.append((table, alias))
 
@@ -206,8 +208,8 @@ class buildTree(lark.Visitor):
                 # Assume it's a table
                 if name not in self.table_columns:
                     raise Exception("Unknown table or column: " + name)
-                if schema + "." + name not in self.foreign_keys.get(schema + "." + tables[-1][0], []):
-                    raise Exception(f"No known join: {tables[-1]} to {name}")
+                if schema not in self.foreign_keys.get(tables[-1][0], {}).get(schema, {}).get(name, {}):
+                    raise Exception(f"No known join: {tables[-1][0]} to {name}")
                 (schema, table, alias) = self._table_alias(schema, children[-1])
                 tables.append((table, alias))
                 columns = ["*"]
@@ -366,7 +368,7 @@ def parse(table_info, foreign_keys, query):
 def join_condition(foreign_keys, schema, t1, t2, a1, a2):
     st1 = schema + "." + t1
     st2 = schema + "." + t2
-    k1, k2 = foreign_keys[st1][st2]
+    k1, k2 = foreign_keys[t1][schema][t2][schema]
     alias_string = " AS " + a2 if a2 != t2 else ""
     j1 = a1 if a1 != t1 else st1
     j2 = a2 if a2 != t2 else st2
@@ -569,7 +571,7 @@ def run_command(cur, table_info, keys, query, limit=100):
     return format_results(results)
 
 class ScryCompleter(Completer):
-    def __init__(self, table_info):
+    def __init__(self, table_info, foreign_keys):
         schemas, tables, columns, table_columns = table_info
         self.schemas = schemas
         self.tables = tables
@@ -583,8 +585,7 @@ class ScryCompleter(Completer):
 
         table_candidates = list(self.tables.keys())
 
-
-        component = doc.get_word_before_cursor("\S*")
+        component = doc.get_word_before_cursor("\\S*")
         column_candidates = []
         parts = component.split(".")
         if len(parts) > 1:
@@ -598,7 +599,7 @@ class ScryCompleter(Completer):
 def repl(cur, table_info, keys):
     session = PromptSession(
             history=FileHistory(os.getenv("HOME") + "/.scry/history"),
-            completer=ScryCompleter(table_info))
+            completer=ScryCompleter(table_info, keys["foreign"]))
     while True:
         res = session.prompt("> ")
         output = run_command(cur, table_info, keys, res)
