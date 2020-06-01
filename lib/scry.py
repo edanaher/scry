@@ -168,7 +168,6 @@ class buildTree(lark.Visitor):
                 if len(self.tables[first_name]) > 1:
                     raise Exception(f"Ambiguous table {first_name} in schemas {', '.join(self.tables[first_name])}")
                 schema = self.tables[first_name][0]
-                print(f"Schema came out as {schema}")
             else:
                 schema = None
             children = tree.children
@@ -391,7 +390,6 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
             for c in tree.get("conditions", []):
                 col, op, value = c
                 query_name = lastAlias if lastAlias != lastTable else schema + "." + lastTable
-                print("Adding query on ", query_name, ".", col)
                 clauses["wheres"].append(f"{query_name}.{col} {op} {value}")
             return clauses
 
@@ -554,8 +552,6 @@ def format_results(results, path="", indent=""):
 
 def run_command(cur, table_info, keys, query, limit=100):
     tree = parse(table_info, keys["foreign"], query)
-    print_tree(tree)
-    print("="*60)
 
 
     sql_clauses = generate_sql(keys, tree)
@@ -592,7 +588,7 @@ class ScryCompleter(Completer):
         if len(parts) > 1:
             prev_part = parts[-2]
             column_candidates = self.table_columns.get(prev_part, [])
-            table_dicts = self.foreign_keys[prev_part].values()
+            table_dicts = self.foreign_keys.get(prev_part, {}).values()
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
 
         candidates = table_candidates + column_candidates
