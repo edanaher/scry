@@ -161,8 +161,10 @@ class buildTree(lark.Visitor):
 
     def _split_path(self, tree):
         first_name = tree.children[0].children[0].value
+        explicit_schema = False
         if first_name in self.schemas:
             schema = first_name
+            explicit_schema = True
             children = tree.children[1:]
         else:
             if first_name not in self.aliases:
@@ -223,7 +225,7 @@ class buildTree(lark.Visitor):
         if terminated:
             columns = []
 
-        return (schema, tables, columns)
+        return (schema, tables, columns, explicit_schema)
 
     def _handle_table_node_mapping(self, tree, table):
         if table in self.table_to_node:
@@ -252,7 +254,7 @@ class buildTree(lark.Visitor):
         return self._find_prefix(tree["children"][alias], rprefix)
 
     def query_path(self, tree):
-        schema, tables, columns = self._split_path(tree)
+        schema, tables, columns, explicit_schema = self._split_path(tree)
 
 
         # TODO: use _find_prefix instead of duplicating logic here.
@@ -271,7 +273,7 @@ class buildTree(lark.Visitor):
 
         # If the table's already in the tree, merge it in there instead of
         # starting a new tree.
-        if not schema and tables[0][1] in self.table_to_node:
+        if not explicit_schema and tables[0][1] in self.table_to_node:
             query_root = self.table_to_node[tables[0][1]]
         else:
             ensure_exists(self.trees, schema, {})
@@ -282,11 +284,11 @@ class buildTree(lark.Visitor):
     def condition(self, tree):
         if tree.children[0].data == "condition_path":
             prefix, suffix = tree.children[0].children
-            schema, prefix_tables, _ = self._split_path(prefix)
-            _, suffix_tables, [column] = self._split_path(suffix)
+            schema, prefix_tables, _, _ = self._split_path(prefix)
+            _, suffix_tables, [column], _ = self._split_path(suffix)
         else: # full_path
             prefix, suffix = tree.children[0].children
-            schema, prefix_tables, _ = self._split_path(prefix)
+            schema, prefix_tables, _, _ = self._split_path(prefix)
             column = suffix.children[0].value
 
             suffix_tables = []
