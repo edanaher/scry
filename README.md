@@ -208,5 +208,4 @@ Currently, the tests are pretty much generated, and require the database to be s
 - schema aliases
 - generally squash the bugs and clean some things up.
 - make tests easier to run.
-- remove None entries from output for non-existing join rows.
 - sorting
