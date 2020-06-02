@@ -514,6 +514,8 @@ def reshape_results(cur, sql_clauses):
     def add_to_main_tree(tree, tree_for_row):
         for table, subtree in tree_for_row.items():
             display = tuple(subtree.get("display", (None,)))
+            if display != (None,) and all(v is None for k, v in display):
+                continue
             hidden = tuple(subtree.get("hidden", (None,)))
             key = (display, hidden)
             ensure_exists(tree, table, key, {})
