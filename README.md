@@ -32,7 +32,7 @@ optional arguments:
                         default schema
 ```
 
-If a command is given, it is run and scry exits; otherwise it drops into a REPL (with auto-completion!)
+If a command is given, it is run and scry exits; otherwise it drops into a REPL (with auto-completion!).  To exit the REPL, type `quit`, `exit`, or use Ctrl-D to send end-of-file.
 
 The database is passed to libpq; the default is "", which is roughly equivalent to `postgresql://$USER@/$USER`.  You likely want to use `postgresql://postgres@` or `user=postgres` if you have a standard installation using the `postgres` user.  Of course, any standard Postgres connection string will work.
 
@@ -192,6 +192,10 @@ SELECT scry.authors.id, scry.books.id, scry.books.title FROM scry.authors LEFT J
 
 TODO
 
+## Tests
+
+Currently, the tests are pretty much generated, and require the database to be set up just right.  There's a TODO to fix this.
+
 ## TODO:
 - use of aliases before declaration(?): "b.authors.name books@b.title"
 - aggregations
@@ -203,3 +207,4 @@ TODO
 - Fuller tab completion in REPL (aliases, schemas)
 - schema aliases
 - generally squash the bugs and clean some things up.
+- make tests easier to run.
