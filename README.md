@@ -111,7 +111,7 @@ Still, if you have long table names, than can be unwieldy.  So you can also use 
 
 However, if a table is aliased, that alias must be used in the rest of the query; in `books@b.title books.year`, `books` and `b` refer to two different instances of the `books` table.  (And as multiple top-level tables aren't currently supported, this will give an error.)  However, this does allow for joins at multiple levels, which will be more useful with conditions.
 
-Finally, instead of individual columns, `*` or no column can be provided; this selects all columns from the table:
+Instead of individual columns, `*` or no column can be provided; this selects all columns from the table:
 
 ```
 > authors
@@ -123,6 +123,17 @@ SELECT scry.authors.id, scry.authors.id, scry.authors.name FROM scry.authors  LI
 - scry.authors.id: 3
   scry.authors.name: Ted Chiang
 ```
+
+Experimental: If the final table in a path is followed by '%', no output is produced; however, aliases are produced.  This can be useful to save some typing:
+
+```
+> users.name users.favorites.books@b% b.year b.authors.name
+```
+
+In this case, the second path just generates the `b` alias which is used later in the query.
+
+However, this seems like a weird syntax that may change.  A trailing period seems like a good way to do this: `users.favorites.books@b.` can be read as an empty list.  But this makes the parser whitespace-dependent: `books@b. b.` will currently be parsed as `books@b.b.`, which is bad.  A slightly uglier alternative `books@b., b.title`, which can be read as a comma-separated empty-list, or as a comma separating two paths.  That's probably better.
+
 
 ### Conditions
 
