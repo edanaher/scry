@@ -1,7 +1,7 @@
 # Scry
 ### A simple language wrapping SQL
 
-Writing SQL is a pain - all the joins, group bys, and so on.  A lot of it should be automatic - your schema is probably structurd such that a sufficiently smart tool could figure out how to get from table A to table B.
+Writing SQL is a pain - all the joins, group bys, and so on.  A lot of it should be automatic - your schema is probably structured such that a sufficiently smart tool could figure out how to get from table A to table B.
 
 Scry is that sufficiently smart tool.
 
