@@ -128,15 +128,15 @@ SELECT scry.authors.id, scry.authors.id, scry.authors.name FROM scry.authors  LI
   scry.authors.name: Ted Chiang
 ```
 
-Experimental: If the final table in a path is followed by '%', no output is produced; however, aliases are produced.  This can be useful to save some typing:
+Experimental: If the final table in a path is followed by '.,', no output is produced; however, aliases are produced.  This can be useful to save some typing:
 
 ```
-> users.name users.favorites.books@b% b.year b.authors.name
+> users.name users.favorites.books@b., b.year b.authors.name
 ```
 
 In this case, the second path just generates the `b` alias which is used later in the query.
 
-However, this seems like a weird syntax that may change.  A trailing period seems like a good way to do this: `users.favorites.books@b.` can be read as an empty list.  But this makes the parser whitespace-dependent: `books@b. b.` will currently be parsed as `books@b.b.`, which is bad.  A slightly uglier alternative `books@b., b.title`, which can be read as a comma-separated empty-list, or as a comma separating two paths.  That's probably better.
+However, this seems like a weird syntax that may change.  A trailing period seems like a good way to do this: `users.favorites.books@b.` can be read as an empty list.  But this makes the parser whitespace-dependent: `books@b. b.` will currently be parsed as `books@b.b.`, which is bad.  The first attempt used `%` as a special terminator, but that was weird and used up a character.  This syntax is also weird, but is otherwise nonsensical, and can be read either as a comma-separated list of empty fields, so fetches nothing, or as an empty column like a trailing period, but with a comma as a separator before the next path
 
 
 ### Conditions

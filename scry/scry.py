@@ -340,7 +340,7 @@ def parse(table_info, foreign_keys, query):
         start: component (WS+ component)*
         component: query_path | condition
 
-        query_path: path_elem ("." path_elem)* ("." columns)? terminator?
+        query_path: path_elem ("." path_elem)* ("." columns |  terminator)?
 
         condition: (condition_path | condition_full_path) comparison_op VALUE
         condition_path: condition_path_prefix ":" condition_path_suffix
@@ -352,7 +352,7 @@ def parse(table_info, foreign_keys, query):
         path_elem: COMPONENT ("@" NAME)?
         columns: COLUMN ("," COLUMN)*
         column: COLUMN
-        terminator: "%"
+        terminator: "." ","
         COMPONENT: NAME
         COLUMN: NAME | "*"
         VALUE: ESCAPED_STRING | SIGNED_NUMBER

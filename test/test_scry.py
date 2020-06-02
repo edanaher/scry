@@ -174,7 +174,7 @@ test_instances = [
         ),
    Instance(
         'Terminator to select no fields',
-        'scry.authors@a% a.name',
+        'scry.authors@a., a.name',
         {'scry': {'children': {'a': {'table': 'authors', 'columns': ['name']}}}},
         {'selects': [('a.name', 'scry.a.name')], 'joins': ['scry.authors AS a'], 'wheres': [], 'uniques': [('a.id', 'scry.a.id')]},
         'SELECT a.id, a.name FROM scry.authors AS a  LIMIT 100',
@@ -183,7 +183,7 @@ test_instances = [
         ),
    Instance(
         'Terminator to select no fields without schema',
-        'authors@a% a.name',
+        'authors@a., a.name',
         {'scry': {'children': {'a': {'table': 'authors', 'columns': ['name']}}}},
         {'selects': [('a.name', 'scry.a.name')], 'joins': ['scry.authors AS a'], 'wheres': [], 'uniques': [('a.id', 'scry.a.id')]},
         'SELECT a.id, a.name FROM scry.authors AS a  LIMIT 100',
