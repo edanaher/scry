@@ -7,6 +7,10 @@ Scry is that sufficiently smart tool.
 
 At least, if you're using Postgres and foreign keys for joins, and can deal with some rough edges.  Otherwise, it's not that tool.  Yet.
 
+## Status
+
+This is just out of proof-of-concept; it seems useful, but is still very much in "get it done quick before I lose interest" mode.  So the code is all in one file, arranged in ways that Make Sense to Me, and probably has a bunch of poorly-named and redundant code.  Enter at your own risk.
+
 ## Installation
 
 If you have Postgres headers installed, `python3 -m pip install git+https://github.com/edanaher/scry` should do the trick.
