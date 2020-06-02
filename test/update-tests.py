@@ -3,13 +3,15 @@
 import argparse
 import os
 import psycopg2
+import sys
 
+# Why is it so hard to get python imports working?
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scry import scry
 
 def parseadd(args):
     db = psycopg2.connect("")
     cur = db.cursor()
-
 
     table_info = scry.get_table_info(cur)
     foreign_keys = scry.get_foreign_keys(cur)
