@@ -4,7 +4,7 @@ import argparse
 import os
 import psycopg2
 
-from lib import scry
+from scry import scry
 
 def parseadd(args):
     db = psycopg2.connect("")

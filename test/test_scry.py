@@ -2,7 +2,7 @@ import psycopg2
 import pytest
 from dataclasses import dataclass
 
-from lib import scry
+from scry import scry
 
 
 def test_table_info():
