@@ -75,8 +75,7 @@ Tables can also be more deeply nested, and multiple (comma-separated) columns ca
 
 ```
 > users.name  users.favorites.books.title,year  users.favorites.books.authors.name
-SELECT scry.users.id, scry.favorites.user_id, scry.favorites.book_id, scry.books.id, scry.authors.id, scry.users.name, scry.books.title, scry.books.year, scry.authors.name FROM scry.users LEFT JOIN scry.favorites ON scry.users.id = scry.favorites.user_id LEFT JOIN scry.books ON scry.favorites.book_id = scry.books.id LEF
-T JOIN scry.authors ON scry.books.author_id = scry.authors.id  LIMIT 100
+SELECT scry.users.id, scry.favorites.user_id, scry.favorites.book_id, scry.books.id, scry.authors.id, scry.users.name, scry.books.title, scry.books.year, scry.authors.name FROM scry.users LEFT JOIN scry.favorites ON scry.users.id = scry.favorites.user_id LEFT JOIN scry.books ON scry.favorites.book_id = scry.books.id LEFT JOIN scry.authors ON scry.books.author_id = scry.authors.id  LIMIT 100
 - scry.users.name: Winnie the Pooh
   - favorites.books.title: Harry Potter and the Philosopher's Stone
     favorites.books.year: 1997
@@ -92,25 +91,22 @@ T JOIN scry.authors ON scry.books.author_id = scry.authors.id  LIMIT 100
     favorites.books.year: 2019
     - authors.name: Ted Chiang
 - scry.users.name: Piglet
-  - favorites.books.title: None
-    favorites.books.year: None
-    - authors.name: None
 ```
 
-Note that for each user, we join through multiple tables to get the title and publication year of their favorite books, as well as those books authors.  And If there is no favorite, we get None.  That seems like a bug.
+Note that for each user, we join through multiple tables to get the title and publication year of their favorite books, as well as those books authors.  And if there is no favorite for that user, no joins show up under that user.
 
 But you don't have to write out all of those tables every time; each table can only occur once in the query (unless aliased as described below), so just giving the unqualified table name will join in into the query at the appropriate point:
 
 ```
 > users.name users.favorites.books.title,year books.authors.name
-[ currently broken, but should be the same as above ]
+[ same output as above]
 ```
 
 Still, if you have long table names, than can be unwieldy.  So you can also use `table@alias` to alias a table to a shorter name (like `AS` in sql) for later in the query:
 
 ```
 > users@u.name u.favorites.books@b.title,year b.authors.name
-[ Also broken ]
+[ same output as above]
 ```
 
 However, if a table is aliased, that alias must be used in the rest of the query; in `books@b.title books.year`, `books` and `b` refer to two different instances of the `books` table.  (And as multiple top-level tables aren't currently supported, this will give an error.)  However, this does allow for joins at multiple levels, which will be more useful with conditions.
