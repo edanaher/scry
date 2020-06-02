@@ -598,7 +598,7 @@ class ScryCompleter(Completer):
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
 
-        candidates = table_candidates + column_candidates
+        candidates = sorted(column_candidates) + sorted(table_candidates)
         matches = [c for c in candidates if c.startswith(word)]
         return [Completion(c, -len(word)) for c in matches]
 
