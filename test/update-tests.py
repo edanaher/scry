@@ -17,7 +17,7 @@ def parseadd(args):
     foreign_keys = scry.get_foreign_keys(cur)
     unique_keys = scry.get_unique_keys(cur)
     query = args.command
-    tree = scry.parse(table_info, foreign_keys, query)
+    tree, aliases, command = scry.parse(table_info, foreign_keys, query)
 
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 

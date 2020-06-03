@@ -369,7 +369,7 @@ def parse(table_info, foreign_keys, query):
         condition_full_path: condition_path_prefix "." column
         condition_path_prefix: path_elem ("." path_elem)*
         condition_path_suffix: path_elem ("." path_elem)*
-        !comparison_op: "=" | "<" | "<=" | ">=" | ">" | "LIKE"i | "ILIKE"i
+        !comparison_op: "=" | "<" | "<=" | "<>" | ">=" | ">" | "LIKE"i | "ILIKE"i
 
         path_elem: COMPONENT ("@" NAME)?
         columns: COLUMN ("," COLUMN)*
@@ -377,7 +377,7 @@ def parse(table_info, foreign_keys, query):
         terminator: "." ","
         COMPONENT: NAME
         COLUMN: NAME | "*"
-        VALUE: ESCAPED_STRING | SIGNED_NUMBER
+        VALUE: ESCAPED_STRING | SIGNED_NUMBER | "NULL"
         SETTING: NAME | SIGNED_NUMBER
 
         %import common.CNAME -> NAME
@@ -417,6 +417,14 @@ def merge_clauses(dst, src):
         dst[k] += vs
 
 def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None, lastTable=None, path=None):
+    def generate_condition(column, op, value):
+        # Oh, SQL and NULL.
+        if op == "=" and value.lower() == "null":
+            op = "IS"
+        if op == "<>" and value.lower() == "null":
+            op = "IS NOT"
+        return f"{column} {op} {value}"
+
     def generate_condition_subquery(baseAlias, baseTable, tree):
         def subcondition_sql(tree, lastTable, lastAlias):
             clauses = {"joins": [], "wheres": []}
@@ -428,7 +436,8 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
             for c in tree.get("conditions", []):
                 col, op, value = c
                 query_name = lastAlias if lastAlias != lastTable else schema + "." + lastTable
-                clauses["wheres"].append(f"{query_name}.{col} {op} {value}")
+
+                clauses["wheres"].append(generate_condition(f"{query_name}.{col}", op, value))
             return clauses
 
         clauses = subcondition_sql(tree, baseTable, baseAlias)
@@ -462,7 +471,7 @@ def generate_sql(keys, tree, schema=None, table=None, alias=None, lastAlias=None
         for c in tree["conditions"].get("conditions", []):
             col, op, value = c
             query_name = alias if alias != table else schema + "." + table
-            clauses["wheres"].append(f"{query_name}.{col} {op} {value}")
+            clauses["wheres"].append(generate_condition(f"{query_name}.{col}", op, value))
         if "children" in tree["conditions"]:
             clauses["wheres"].append(generate_condition_subquery(alias, table, tree["conditions"]))
 
