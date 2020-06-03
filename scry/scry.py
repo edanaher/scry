@@ -591,7 +591,7 @@ def format_results(results, path="", indent=""):
     return output
 
 def run_setting(settings, key, value):
-    print("Setting ", key, " = ", value)
+    print("Setting", key, "=", value)
     settings[key] = value
 
 
