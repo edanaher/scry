@@ -269,21 +269,6 @@ class buildTree(lark.Visitor):
     def query_path(self, tree):
         schema, tables, columns, explicit_schema = self._split_path(tree)
 
-
-        # TODO: use _find_prefix instead of duplicating logic here.
-        def updateTree(tree, tables, columns):
-            if tables == []:
-                ensure_exists(tree, "columns", [])
-                tree["columns"] += columns
-                return
-
-            (table, alias), *rtables = tables
-            ensure_exists(tree, "children", {})
-            self._handle_table_node_mapping(tree, alias)
-            ensure_exists(tree, "children", alias, {})
-            tree["children"][alias]["table"] = table
-            updateTree(tree["children"][alias], rtables, columns)
-
         # If the table's already in the tree, merge it in there instead of
         # starting a new tree.
         if not explicit_schema and tables[0][1] in self.table_to_node:
@@ -292,7 +277,9 @@ class buildTree(lark.Visitor):
             ensure_exists(self.trees, schema, {})
             query_root = self.trees[schema]
 
-        updateTree(query_root, tables, columns)
+        target = self._find_prefix(query_root, tables)
+        ensure_exists(target, "columns", [])
+        target["columns"] += columns
 
     def condition(self, tree):
         if tree.children[0].data == "condition_path":
