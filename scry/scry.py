@@ -6,6 +6,7 @@ import psycopg2
 from lark import Lark
 import lark
 import os
+import re
 import sys
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
@@ -356,7 +357,7 @@ def parse(table_info, foreign_keys, query):
     p = Lark(r"""
         start: query | set
 
-        set: "\\set" NAME VALUE
+        set: "\\set" NAME SETTING
 
         query: component (WS+ component)*
         component: query_path | condition
@@ -377,6 +378,7 @@ def parse(table_info, foreign_keys, query):
         COMPONENT: NAME
         COLUMN: NAME | "*"
         VALUE: ESCAPED_STRING | SIGNED_NUMBER
+        SETTING: NAME | SIGNED_NUMBER
 
         %import common.CNAME -> NAME
         %import common.ESCAPED_STRING
@@ -589,10 +591,8 @@ def format_results(results, path="", indent=""):
     return output
 
 def run_setting(settings, key, value):
-    if value[0] == '"' and value[-1] == '"':
-        settings[key] = value[1:-1]
-    else:
-        settings[key] = int(value)
+    print("Setting ", key, " = ", value)
+    settings[key] = value
 
 
 def run_command(settings, cur, table_info, keys, query, limit=100):
@@ -625,10 +625,19 @@ class ScryCompleter(Completer):
 
     def get_completions(self, doc, event):
         full_line = "\n".join(doc.lines)
+        word = doc.get_word_before_cursor()
 
-        # TODO: Handle completions for \set
+        # TODO: Make this less hacky
         if full_line[0] == "\\":
-            return []
+            words = re.split("\s+", full_line)
+            if words[0] == "\\set":
+                candidates = []
+                if len(words) == 2:
+                    candidates = ["complete_style"]
+                if len(words) == 3 and words[1] == "complete_style":
+                    candidates = completion_styles.keys()
+                matches = [c for c in candidates if c.startswith(word)]
+                return [Completion(c, -len(word)) for c in matches]
 
         aliases = {}
         # There really should be a way to tell Lark to parse as far as it can,
@@ -642,7 +651,6 @@ class ScryCompleter(Completer):
             except lark.exceptions.LarkError:
                 pass
 
-        word = doc.get_word_before_cursor()
         if word == ".":
             word = ""
 
