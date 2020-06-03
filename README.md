@@ -204,8 +204,9 @@ Currently, the tests are pretty much generated, and require the database to be s
 - path finding (table1..table3, find join via table.table2.table3)
 - config file - connection strings, aliases
 - list tables in schema
-- Fuller tab completion in REPL (aliases, schemas)
+- Fuller tab completion in REPL (schemas)
 - schema aliases
 - generally squash the bugs and clean some things up.
 - make tests easier to run.
 - sorting
+- other output formats (psql-style table, list of fields)

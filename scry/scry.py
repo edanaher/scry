@@ -128,6 +128,19 @@ def ensure_exists(dict, *args):
             dict[key] = {}
         ensure_exists(dict[key], *rargs)
 
+class findAliases(lark.Visitor):
+    def __init__(self):
+        self.aliases = {}
+
+    def path_elem(self, tree):
+        # No alias
+        if len(tree.children) == 1:
+            return
+
+        table = tree.children[0].value
+        alias = tree.children[1].value
+        self.aliases[alias] = table
+
 
 class buildTree(lark.Visitor):
     def __init__(self, tables, table_columns, foreign_keys, schemas):
@@ -364,9 +377,16 @@ def parse(table_info, foreign_keys, query):
         %ignore WS
     """)
     parsed = p.parse(query)
+    at = findAliases()
+    at.visit(parsed)
+    aliases = at.aliases
+
+    # TODO: We should use aliases in buildTree; that would simplify
+    # things and let us use aliases before they're declared.  But
+    # schemas complicate that, since we don't have them yet.
     t = buildTree(tables, table_columns, foreign_keys, schemas)
     t.visit(parsed)
-    return t.trees
+    return (t.trees, aliases)
 
 
 def join_condition(foreign_keys, schema, t1, t2, a1, a2):
@@ -558,8 +578,7 @@ def format_results(results, path="", indent=""):
     return output
 
 def run_command(cur, table_info, keys, query, limit=100):
-    tree = parse(table_info, keys["foreign"], query)
-
+    tree, aliases = parse(table_info, keys["foreign"], query)
 
     sql_clauses = generate_sql(keys, tree)
 
@@ -576,6 +595,7 @@ def run_command(cur, table_info, keys, query, limit=100):
 class ScryCompleter(Completer):
     def __init__(self, table_info, foreign_keys):
         schemas, tables, columns, table_columns = table_info
+        self.table_info = table_info
         self.schemas = schemas
         self.tables = tables
         self.columns = columns
@@ -583,6 +603,19 @@ class ScryCompleter(Completer):
         self.foreign_keys = foreign_keys
 
     def get_completions(self, doc, event):
+        full_line = "\n".join(doc.lines)
+        aliases = {}
+        # There really should be a way to tell Lark to parse as far as it can,
+        # but just taking the longest parsable prefix should be good enough.
+        for l in range(len(full_line), 0, -1):
+            try:
+                _, aliases = parse(self.table_info, self.foreign_keys, full_line[:l])
+                break
+            except ScryException:
+                pass
+            except lark.exceptions.LarkError:
+                pass
+
         word = doc.get_word_before_cursor()
         if word == ".":
             word = ""
@@ -594,6 +627,7 @@ class ScryCompleter(Completer):
         parts = component.split(".")
         if len(parts) > 1:
             prev_part = parts[-2]
+            prev_part = aliases.get(prev_part, prev_part)
             column_candidates = self.table_columns.get(prev_part, [])
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
