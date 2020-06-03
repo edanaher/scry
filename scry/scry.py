@@ -10,9 +10,21 @@ import sys
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.shortcuts.prompt import CompleteStyle
 
 class ScryException(Exception):
     pass
+
+completion_styles = {
+    "column": CompleteStyle.COLUMN,
+    "multi_column": CompleteStyle.MULTI_COLUMN,
+    "readline": CompleteStyle.READLINE_LIKE
+}
+
+def default_settings():
+    return {
+        "complete_style": "column"
+    }
 
 def get_table_info(cur):
     schemas = set()
@@ -329,15 +341,24 @@ class buildTree(lark.Visitor):
             prefixNode["conditions"]["children"][a]["table"] = t
             addConstraint(prefixNode["conditions"]["children"][a], ts)
 
-
+def parse_set(tree):
+    if tree.children[0].data != "set":
+        return None
+    property = tree.children[0].children[0].value
+    value = tree.children[0].children[1].value
+    return (property, value)
 
 def parse(table_info, foreign_keys, query):
     def choices(cs):
         return "|".join(sorted([f'"{c}"' for c in cs],key=len,reverse=True))
 
     schemas, tables, columns, table_columns = table_info
-    p = Lark(f"""
-        start: component (WS+ component)*
+    p = Lark(r"""
+        start: query | set
+
+        set: "\\set" NAME VALUE
+
+        query: component (WS+ component)*
         component: query_path | condition
 
         query_path: path_elem ("." path_elem)* ("." columns |  terminator)?
@@ -364,6 +385,9 @@ def parse(table_info, foreign_keys, query):
         %ignore WS
     """)
     parsed = p.parse(query)
+    parsed_set = parse_set(parsed)
+    if parsed_set:
+        return (None, None, parsed_set)
     at = findAliases()
     at.visit(parsed)
     aliases = at.aliases
@@ -373,7 +397,7 @@ def parse(table_info, foreign_keys, query):
     # schemas complicate that, since we don't have them yet.
     t = buildTree(tables, table_columns, foreign_keys, schemas)
     t.visit(parsed)
-    return (t.trees, aliases)
+    return (t.trees, aliases, None)
 
 
 def join_condition(foreign_keys, schema, t1, t2, a1, a2):
@@ -564,8 +588,18 @@ def format_results(results, path="", indent=""):
 
     return output
 
-def run_command(cur, table_info, keys, query, limit=100):
-    tree, aliases = parse(table_info, keys["foreign"], query)
+def run_setting(settings, key, value):
+    if value[0] == '"' and value[-1] == '"':
+        settings[key] = value[1:-1]
+    else:
+        settings[key] = int(value)
+
+
+def run_command(settings, cur, table_info, keys, query, limit=100):
+    tree, aliases, setting = parse(table_info, keys["foreign"], query)
+    if setting:
+        run_setting(settings, *setting)
+        return
 
     sql_clauses = generate_sql(keys, tree)
 
@@ -591,12 +625,17 @@ class ScryCompleter(Completer):
 
     def get_completions(self, doc, event):
         full_line = "\n".join(doc.lines)
+
+        # TODO: Handle completions for \set
+        if full_line[0] == "\\":
+            return []
+
         aliases = {}
         # There really should be a way to tell Lark to parse as far as it can,
         # but just taking the longest parsable prefix should be good enough.
         for l in range(len(full_line), 0, -1):
             try:
-                _, aliases = parse(self.table_info, self.foreign_keys, full_line[:l])
+                _, aliases, _ = parse(self.table_info, self.foreign_keys, full_line[:l])
                 break
             except ScryException:
                 pass
@@ -623,18 +662,20 @@ class ScryCompleter(Completer):
         matches = [c for c in candidates if c.startswith(word)]
         return [Completion(c, -len(word)) for c in matches]
 
-def repl(cur, table_info, keys):
+def repl(settings, cur, table_info, keys):
     session = PromptSession(
             history=FileHistory(os.getenv("HOME") + "/.scry/history"),
             completer=ScryCompleter(table_info, keys["foreign"]))
     try:
         while True:
-            command = session.prompt("> ")
+            complete_style = completion_styles[settings.get("complete_style", CompleteStyle.COLUMN)]
+            command = session.prompt("> ", complete_style=complete_style)
             if command in ["quit", "break", "bye"]:
                 break
             try:
-                output = run_command(cur, table_info, keys, command)
-                print("\n".join(output))
+                output = run_command(settings, cur, table_info, keys, command)
+                if output is not None:
+                    print("\n".join(output))
             except ScryException as e:
                 print(e)
             except lark.exceptions.LarkError as e:
@@ -647,15 +688,17 @@ def main():
     db = psycopg2.connect(args.database or "")
     cur = db.cursor()
 
+    settings = default_settings()
     table_info = get_table_info(cur)
     foreign_keys = get_foreign_keys(cur)
     unique_keys = get_unique_keys(cur)
     keys = { "unique": unique_keys, "foreign": foreign_keys }
     if args.command:
-        output = run_command(cur, table_info, keys, args.command, args.limit)
-        print("\n".join(output))
+        output = run_command(settings, cur, table_info, keys, args.command, args.limit)
+        if output is not None:
+            print("\n".join(output))
     else:
-        repl(cur, table_info, keys)
+        repl(settings, cur, table_info, keys)
 
 
 if __name__ == "__main__":

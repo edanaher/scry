@@ -247,7 +247,7 @@ def run_test(instance):
     unique_keys = scry.get_unique_keys(cur)
     keys = {"unique": unique_keys, "foreign": foreign_keys}
 
-    tree, aliases = scry.parse(table_info, foreign_keys, instance.query)
+    tree, aliases, _ = scry.parse(table_info, foreign_keys, instance.query)
     assert tree == instance.tree
 
     sql_clauses = scry.generate_sql(keys, tree)
