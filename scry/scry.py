@@ -704,6 +704,7 @@ def repl(settings, cur, table_info, keys):
 def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
+    db.autocommit = True
     cur = db.cursor()
 
     settings = default_settings()
