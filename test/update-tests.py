@@ -75,7 +75,7 @@ def parseupdate(args):
     for instance in test_instances:
         name = instance.name
         query = instance.query
-        tree = scry.parse(table_info, foreign_keys, query)
+        tree = scry.parse({"aliases":{}}, table_info, foreign_keys, query)
         if should_be_same("tree") and tree != instance.tree:
             raise Exception(f"Tree doesn't match for {name}\n\n{tree}\n\n{instance.tree}")
 

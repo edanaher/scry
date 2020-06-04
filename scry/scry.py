@@ -24,7 +24,10 @@ completion_styles = {
 
 def default_settings():
     return {
-        "complete_style": "column"
+        "config": {
+            "complete_style": "column"
+        },
+        "aliases": {}
     }
 
 def get_table_info(cur):
@@ -349,12 +352,20 @@ def parse_set(tree):
     value = tree.children[0].children[1].value
     return (property, value)
 
-def parse(table_info, foreign_keys, query, aliases_only=False):
+def parse_alias(tree):
+    if tree.children[0].data != "alias":
+        return None
+    table = tree.children[0].children[0].value
+    alias = tree.children[0].children[1].value
+    return (table, alias)
+
+def parse(settings, table_info, foreign_keys, query, aliases_only=False):
     schemas, tables, columns, table_columns = table_info
     p = Lark(r"""
-        start: query | set
+        start: query | set | alias
 
         set: "\\set" NAME SETTING
+        alias: "\\alias" NAME "@"? NAME
 
         query: component (WS+ component)*
         component: query_path | condition
@@ -386,10 +397,16 @@ def parse(table_info, foreign_keys, query, aliases_only=False):
     parsed = p.parse(query)
     parsed_set = parse_set(parsed)
     if parsed_set:
-        return (None, None, parsed_set)
+        return (None, None, parsed_set, None)
+    parsed_alias = parse_alias(parsed)
+    if parsed_alias:
+        return (None, None, None, parsed_alias)
     at = findAliases()
     at.visit(parsed)
-    aliases = at.aliases
+    local_aliases = at.aliases
+    aliases = settings["aliases"].copy()
+    aliases.update(local_aliases)
+
     if aliases_only:
         return aliases
 
@@ -398,7 +415,7 @@ def parse(table_info, foreign_keys, query, aliases_only=False):
     # schemas complicate that, since we don't have them yet.
     t = buildTree(tables, table_columns, foreign_keys, schemas)
     t.visit(parsed)
-    return (t.trees, aliases, None)
+    return (t.trees, aliases, None, None)
 
 
 def join_condition(foreign_keys, schema, t1, t2, a1, a2):
@@ -600,13 +617,22 @@ def format_results(results, path="", indent=""):
 
 def run_setting(settings, key, value):
     print("Setting", key, "=", value)
-    settings[key] = value
+    settings["config"][key] = value
 
 
 def run_command(settings, cur, table_info, keys, query, limit=100):
-    tree, aliases, setting = parse(table_info, keys["foreign"], query)
+    tree, aliases, setting, alias = parse(settings, table_info, keys["foreign"], query)
     if setting:
         run_setting(settings, *setting)
+        return
+
+    if alias:
+        (table, alias) = alias
+        if table not in table_info[3]:
+            print("Unknown table to alias: ", table)
+            return
+        print(f"Alias '{alias}' created for {table}")
+        settings["aliases"][alias] = table
         return
 
     sql_clauses = generate_sql(keys, tree)
@@ -622,7 +648,7 @@ def run_command(settings, cur, table_info, keys, query, limit=100):
     return format_results(results)
 
 class ScryCompleter(Completer):
-    def __init__(self, table_info, foreign_keys):
+    def __init__(self, settings, table_info, foreign_keys):
         schemas, tables, columns, table_columns = table_info
         self.table_info = table_info
         self.schemas = schemas
@@ -630,6 +656,7 @@ class ScryCompleter(Completer):
         self.columns = columns
         self.table_columns = table_columns
         self.foreign_keys = foreign_keys
+        self.settings = settings
 
     def get_completions(self, doc, event):
         full_line = "\n".join(doc.lines)
@@ -653,7 +680,7 @@ class ScryCompleter(Completer):
         # TODO: This should do exponential/binary search after the first couple.
         for l in range(len(full_line), 0, -1):
             try:
-                aliases = parse(self.table_info, self.foreign_keys, full_line[:l], aliases_only=True)
+                aliases = parse(self.settings, self.table_info, self.foreign_keys, full_line[:l], aliases_only=True)
                 break
             except ScryException:
                 pass
@@ -682,11 +709,11 @@ class ScryCompleter(Completer):
 def repl(settings, cur, table_info, keys):
     session = PromptSession(
             history=FileHistory(os.getenv("HOME") + "/.scry/history"),
-            completer=ScryCompleter(table_info, keys["foreign"]),
+            completer=ScryCompleter(settings, table_info, keys["foreign"]),
             complete_in_thread=True)
     try:
         while True:
-            complete_style = completion_styles[settings.get("complete_style", CompleteStyle.COLUMN)]
+            complete_style = completion_styles[settings["config"].get("complete_style", CompleteStyle.COLUMN)]
             command = session.prompt("> ", complete_style=complete_style)
             if command in ["quit", "break", "bye"]:
                 break

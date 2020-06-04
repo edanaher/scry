@@ -271,6 +271,15 @@ test_instances = [
         {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}}}}},
         ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: J.K. Rowling']
         ),
+   Instance(
+        'deep condition on a NULL field',
+        'authors.name authors:books.series_books.series_id = NULL',
+        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '=', 'NULL')]}}}}}}}}},
+        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
+        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL) LIMIT 100',
+        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
+        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: Ted Chiang']
+        ),
     # End of instances
 ]
 #'books.title books.series_books.series.name series.name = "Harry Potter"'
@@ -284,7 +293,7 @@ def run_test(instance):
     unique_keys = scry.get_unique_keys(cur)
     keys = {"unique": unique_keys, "foreign": foreign_keys}
 
-    tree, aliases, _ = scry.parse(table_info, foreign_keys, instance.query)
+    tree, aliases, _, _ = scry.parse({"aliases":{}}, table_info, foreign_keys, instance.query)
     assert tree == instance.tree
 
     sql_clauses = scry.generate_sql(keys, tree)
