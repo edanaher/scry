@@ -701,6 +701,14 @@ def repl(settings, cur, table_info, keys):
     except EOFError:
         pass
 
+def read_rcfile(settings, cur, table_info, keys, limit):
+    try:
+        with open(os.getenv("HOME") + "/.scry/scryrc") as rcfile:
+            for line in rcfile.readlines():
+                run_command(settings, cur, table_info, keys, line, limit)
+    except FileNotFoundError:
+        pass
+
 def main():
     args = parseargs()
     db = psycopg2.connect(args.database or "")
@@ -712,6 +720,9 @@ def main():
     foreign_keys = get_foreign_keys(cur)
     unique_keys = get_unique_keys(cur)
     keys = { "unique": unique_keys, "foreign": foreign_keys }
+
+    read_rcfile(settings, cur, table_info, keys, args.limit)
+
     if args.command:
         output = run_command(settings, cur, table_info, keys, args.command, args.limit)
         if output is not None:
