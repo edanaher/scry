@@ -349,10 +349,7 @@ def parse_set(tree):
     value = tree.children[0].children[1].value
     return (property, value)
 
-def parse(table_info, foreign_keys, query):
-    def choices(cs):
-        return "|".join(sorted([f'"{c}"' for c in cs],key=len,reverse=True))
-
+def parse(table_info, foreign_keys, query, aliases_only=False):
     schemas, tables, columns, table_columns = table_info
     p = Lark(r"""
         start: query | set
@@ -393,6 +390,8 @@ def parse(table_info, foreign_keys, query):
     at = findAliases()
     at.visit(parsed)
     aliases = at.aliases
+    if aliases_only:
+        return aliases
 
     # TODO: We should use aliases in buildTree; that would simplify
     # things and let us use aliases before they're declared.  But
@@ -651,9 +650,10 @@ class ScryCompleter(Completer):
         aliases = {}
         # There really should be a way to tell Lark to parse as far as it can,
         # but just taking the longest parsable prefix should be good enough.
+        # TODO: This should do exponential/binary search after the first couple.
         for l in range(len(full_line), 0, -1):
             try:
-                _, aliases, _ = parse(self.table_info, self.foreign_keys, full_line[:l])
+                aliases = parse(self.table_info, self.foreign_keys, full_line[:l], aliases_only=True)
                 break
             except ScryException:
                 pass
@@ -682,7 +682,8 @@ class ScryCompleter(Completer):
 def repl(settings, cur, table_info, keys):
     session = PromptSession(
             history=FileHistory(os.getenv("HOME") + "/.scry/history"),
-            completer=ScryCompleter(table_info, keys["foreign"]))
+            completer=ScryCompleter(table_info, keys["foreign"]),
+            complete_in_thread=True)
     try:
         while True:
             complete_style = completion_styles[settings.get("complete_style", CompleteStyle.COLUMN)]
