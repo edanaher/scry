@@ -661,18 +661,25 @@ class ScryCompleter(Completer):
     def get_completions(self, doc, event):
         full_line = "\n".join(doc.lines)
         word = doc.get_word_before_cursor()
+        fullword = doc.get_word_before_cursor("\S*")
 
         # TODO: Make this less hacky
         if full_line[0] == "\\":
             words = re.split("\s+", full_line)
+            candidates = []
+            if len(words) == 1:
+                word = words[0]
+                candidates = ["\\set", "\\alias"]
             if words[0] == "\\set":
-                candidates = []
                 if len(words) == 2:
                     candidates = ["complete_style"]
                 if len(words) == 3 and words[1] == "complete_style":
                     candidates = completion_styles.keys()
-                matches = [c for c in candidates if c.startswith(word)]
-                return [Completion(c, -len(word)) for c in matches]
+            if words[0] == "\\alias":
+                if len(words) == 2:
+                    candidates = self.tables.keys()
+            matches = [c for c in candidates if c.startswith(word)]
+            return [Completion(c, -len(word)) for c in matches]
 
         aliases = {}
         # There really should be a way to tell Lark to parse as far as it can,
