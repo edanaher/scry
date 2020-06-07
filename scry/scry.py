@@ -223,13 +223,11 @@ class findAliases(lark.Transformer):
             # An alias definition.  Straightforward
             if len(elem) == 2:
                 table, alias = elem
-            print("elem is", elem)
 
             # TODO: Update the schema in case of cross-schema joins.
             # Actually add an alias
             self.aliases[alias] = (schema, path.copy(), table)
             path.append(alias)
-            print("Added alias", table, "@", alias)
 
     def query(self, children):
         # Filter out whitespace
@@ -273,11 +271,14 @@ class findAliases(lark.Transformer):
     def columns(self, children):
         return [c.value for c in children]
 
+    def terminator(self, children):
+        return []
 
 
 
-class buildTree(lark.Visitor):
-    def __init__(self, settings, tables, table_columns, foreign_keys, schemas):
+
+class buildTree(lark.Transformer):
+    def __init__(self, settings, tables, table_columns, foreign_keys, schemas, aliases):
         self.trees = {}
         self.settings = settings
         self.tables = tables
@@ -285,26 +286,23 @@ class buildTree(lark.Visitor):
         self.foreign_keys = foreign_keys
         self.schemas = schemas
         self.table_to_node = {}
-        self.aliases = {}
+        self.aliases = aliases
 
     def _table_alias(self, schema, tree):
         table = tree.children[0].value
+        # An alias definition; look up what it resolved to and return it.
         if len(tree.children) > 1:
-            # An alias; save it.
             alias = tree.children[1].value
-        else:
-            if table in self.aliases:
-                # If it's just an alias, pull it out.
-                alias = table
-                schema, table = self.aliases[alias]
-            else:
-                # If it's just a table, it aliases to itself.
-                alias = table
-        if alias in self.aliases and self.aliases[alias] != (schema, table):
-            raise ScryException(f"Alias conflict: {alias} used for both {self.aliases[alias]} and {table}")
-        if schema is None:
-            raise ScryException(f"Unable to figure out schema for {table}@{alias}")
-        self.aliases[alias] = (schema, table)
+            schema, path, table = aliases[alias]
+            return (schema, table, alias)
+
+        # Otherwise just look up the table.
+        if table not in self.aliases:
+            raise ScryException(f"Table {table} not found in aliases.  Uh oh.")
+        return
+
+        alias = tree.children[0].value
+        schema, path, table = aliases[alias]
         return (schema, table, alias)
 
     def _split_path(self, tree):
@@ -375,48 +373,49 @@ class buildTree(lark.Visitor):
 
         return (schema, tables, columns, explicit_schema)
 
-    def _handle_table_node_mapping(self, tree, table):
-        if table in self.table_to_node:
-            existing = self.table_to_node[table]
-            if tree != existing:
-                # If the tree isn't a root, we have a problem.
-                if existing != self.trees[None]:
-                    raise ScryException(f"Table {table} duplicated in tree!")
-
-                # If the existing tree is a root, splice it in here.
-                tree["children"][table] = self.trees[None]["children"][table]
-                self.trees[None]["children"].pop(table)
-                if self.trees[None]["children"] == {}:
-                    self.trees.pop(None)
-        else:
-            self.table_to_node[table] = tree
-
     def _find_prefix(self, tree, prefix):
         if prefix == []:
             return tree
-        ((table, alias), *rprefix) = prefix
-        ensure_exists(tree, "children", {})
-        self._handle_table_node_mapping(tree, alias)
+        (alias, *rprefix) = prefix
         ensure_exists(tree, "children", alias, {})
-        tree["children"][alias]["table"] = table
+        if "table" not in tree["children"][alias]:
+            _, _, table = self.aliases[alias]
+            tree["children"][alias]["table"] = table
         return self._find_prefix(tree["children"][alias], rprefix)
 
-    def query_path(self, tree):
-        schema, tables, columns, explicit_schema = self._split_path(tree)
+    def query_path(self, children):
+        if children[0] in self.schemas:
+            children = children[1:]
 
-        # If the table's already in the tree, merge it in there instead of
-        # starting a new tree.
-        if not explicit_schema and tables[0][1] in self.table_to_node:
-            query_root = self.table_to_node[tables[0][1]]
-        else:
-            ensure_exists(self.trees, schema, {})
-            query_root = self.trees[schema]
+        if len(children) == 1:
+            alias = children[0]
+            columns = ["*"]
+        elif isinstance(children[-1], list):
+            alias = children[-2]
+            columns = children[-1]
+        else :
+            if children[-1] in self.table_columns[self.aliases[children[-2]][2]]:
+                alias = children[-2]
+                columns = [children[-1]]
+            else:
+                alias = children[-1]
+                columns = ["*"]
 
-        target = self._find_prefix(query_root, tables)
+        schema, path, table = self.aliases[alias]
+
+        ensure_exists(self.trees, schema, {})
+        query_root = self.trees[schema]
+
+        target = self._find_prefix(query_root, path + [alias])
         ensure_exists(target, "columns", [])
+
+        if "*" in columns:
+            columns = self.table_columns[table]
+
         target["columns"] += columns
 
-    def condition(self, tree):
+    def condition(self, children):
+        raise ScryException("unimplemented")
         if tree.children[0].data == "condition_path":
             prefix, suffix = tree.children[0].children
             schema, prefix_tables, _, _ = self._split_path(prefix)
@@ -463,6 +462,21 @@ class buildTree(lark.Visitor):
             ensure_exists(prefixNode, "conditions", "children", a, {})
             prefixNode["conditions"]["children"][a]["table"] = t
             addConstraint(prefixNode["conditions"]["children"][a], ts)
+
+    def path_elem(self, children):
+        # No alias; use the table name
+        table = children[0].value
+        if len(children) == 1:
+            return children[0].value
+
+        # Otherwise return the alias
+        return children[1].value
+
+    def columns(self, children):
+        return [c.value for c in children]
+
+    def terminator(self, children):
+        return []
 
 def parse_set(tree):
     if tree.children[0].data != "set":
@@ -529,15 +543,9 @@ def parse(settings, table_info, foreign_keys, query, aliases_only=False):
 
     if aliases_only:
         return aliases
-    # DEBUG
-    print("aliases are", aliases)
-    return None, None, None, aliases
 
-    # TODO: We should use aliases in buildTree; that would simplify
-    # things and let us use aliases before they're declared.  But
-    # schemas complicate that, since we don't have them yet.
-    t = buildTree(settings, tables, table_columns, foreign_keys, schemas)
-    t.visit(parsed)
+    t = buildTree(settings, tables, table_columns, foreign_keys, schemas, aliases)
+    t.transform(parsed)
     return (t.trees, aliases, None, None)
 
 
@@ -745,7 +753,6 @@ def run_setting(settings, key, value):
 
 def run_command(settings, cur, table_info, keys, query, limit=100):
     tree, aliases, setting, alias = parse(settings, table_info, keys["foreign"], query)
-    return
     if setting:
         run_setting(settings, *setting)
         return
@@ -785,11 +792,11 @@ class ScryCompleter(Completer):
     def get_completions(self, doc, event):
         full_line = "\n".join(doc.lines)
         word = doc.get_word_before_cursor()
-        fullword = doc.get_word_before_cursor("\S*")
+        fullword = doc.get_word_before_cursor("\\S*")
 
         # TODO: Make this less hacky
         if full_line[0] == "\\":
-            words = re.split("\s+", full_line)
+            words = re.split("\\s+", full_line)
             candidates = []
             if len(words) == 1:
                 word = words[0]
