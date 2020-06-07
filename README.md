@@ -210,3 +210,8 @@ Currently, the tests are pretty much generated, and require the database to be s
 - make tests easier to run.
 - sorting
 - other output formats (psql-style table, list of fields)
+- column aliases (for output)
+- put limit in settings (\set limit 100)
+- test using a table name as an alias
+- add error tests (alias declared twice or used in bad position, unknown table, bad join, etc.)
+- handle cross-schema joins
