@@ -202,18 +202,34 @@ class findAliases(lark.Transformer):
             # Skip columns
             if isinstance(elem, list):
                 continue
+
             # TODO: Check for proper joins.
-            # Skip ones that aren't alias declarations.
             # TODO: We should check that these aren't inconsistent.
-            if len(elem) == 1:
+
+            # If it's just an alias...  it's fine.
+            # TODO: As long as it's in the right place.
+            if len(elem) == 1 and elem[0] in self.aliases:
                 path.append(elem[0])
                 continue
 
-            table, alias = elem
+            # If it's not an alias, it implicity aliases to itself.
+            if len(elem) == 1 and elem[0] not in self.aliases:
+                # This should never happen, I think?
+                if elem[0] in self.seen_aliases:
+                    raise ScryException("Alias inconsistency.  Uh oh.")
+                table = elem[0]
+                alias = table
+
+            # An alias definition.  Straightforward
+            if len(elem) == 2:
+                table, alias = elem
+            print("elem is", elem)
+
+            # TODO: Update the schema in case of cross-schema joins.
             # Actually add an alias
             self.aliases[alias] = (schema, path.copy(), table)
             path.append(alias)
-            # TODO: Update the schema in case of cross-schema joins.
+            print("Added alias", table, "@", alias)
 
     def query(self, children):
         # Filter out whitespace
