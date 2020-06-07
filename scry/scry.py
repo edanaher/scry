@@ -25,7 +25,8 @@ completion_styles = {
 def default_settings():
     return {
         "config": {
-            "complete_style": "column"
+            "complete_style": "column",
+            "search_path": "scry,public,information_schema"
         },
         "aliases": {}
     }
@@ -144,23 +145,128 @@ def ensure_exists(dict, *args):
             dict[key] = {}
         ensure_exists(dict[key], *rargs)
 
-class findAliases(lark.Visitor):
-    def __init__(self):
+class findAliases(lark.Transformer):
+    def __init__(self, settings, table_info, foreign_keys):
+        schemas, tables, columns, table_columns = table_info
+        self.settings = settings
+        self.schemas = schemas
+        self.tables = tables
+        self.table_columns = table_columns
+        self.foreign_keys = foreign_keys
+        self.seen_aliases = set()
         self.aliases = {}
 
-    def path_elem(self, tree):
-        # No alias
-        if len(tree.children) == 1:
-            return
+    def _schema_for_table(self, table):
+        if table in self.aliases:
+            return self.aliases[table][0]
+        if table not in self.tables:
+            return None
+        for s in self.settings["config"]["search_path"].split(","):
+            if s in self.tables[table]:
+                return s
+        # If it's not in the search_path, just take the first one.
+        return list(self.tables[table].keys())[0]
 
-        table = tree.children[0].value
-        alias = tree.children[1].value
-        self.aliases[alias] = table
+    def _aliases_needed_for_path(self, path):
+        needed = []
+        # TODO: will this have issues with singleton columns named the same as aliases?
+        for t in path:
+            if isinstance(t, list): # columns
+                continue
+            if len(t) == 2: # declaring an alias
+                continue
+            table = t[0]
+            if table in self.seen_aliases:
+                needed.append(table)
+        return needed
+
+
+    def _add_aliases(self, elems):
+        print("Adding aliases for ", elems)
+
+        first_elem = elems[0]
+        path = []
+
+        if first_elem[0] in self.aliases:
+            s, p, t = self.aliases[first_elem[0]]
+            schema = s
+            path = p.copy()
+        # Can't alias schemas yet
+        elif len(first_elem) == 1 and first_elem[0] in self.schemas:
+            schema = first_elem[0]
+            elems = elems[1:]
+        else:
+            schema = self._schema_for_table(first_elem[0])
+            if not schema:
+                raise ScryException(f"Unable to resolve schema for {first_elem[0]}")
+
+        for elem in elems:
+            # Skip columns
+            if isinstance(elem, list):
+                continue
+            # TODO: Check for proper joins.
+            # Skip ones that aren't alias declarations.
+            # TODO: We should check that these aren't inconsistent.
+            if len(elem) == 1:
+                path.append(elem[0])
+                continue
+
+            table, alias = elem
+            # Actually add an alias
+            self.aliases[alias] = (schema, path.copy(), table)
+            path.append(alias)
+            # TODO: Update the schema in case of cross-schema joins.
+
+    def query(self, children):
+        # Filter out whitespace
+        children = [c for c in children if isinstance(c, list)]
+
+        # Tag queries with what aliases they need before they can be resolved
+        children_with_aliases = [(c, self._aliases_needed_for_path(c)) for c in children]
+
+        updated_one = True
+        while children_with_aliases and updated_one:
+            updated_one = False
+            next_round = []
+            for ca in children_with_aliases:
+                # If any needed aliases are unresolved, put this one off.
+                print("Trying ", ca)
+                needed_aliases = ca[1]
+                if not all(a in self.aliases for a in needed_aliases):
+                    next_round.append(ca)
+                    continue
+
+                # Add aliases for thie query, since we have everything we need.
+                self._add_aliases(ca[0])
+                updated_one = True
+            children_with_aliases = next_round
+
+    def component(self, children):
+        return children[0]
+
+    def query_path(self, children):
+        return children
+
+    def path_elem(self, children):
+        # No alias
+        table = children[0].value
+        if len(children) == 1:
+            return (table,)
+
+        alias = children[1].value
+        self.seen_aliases.add(alias)
+        return (table, alias)
+
+    def columns(self, children):
+        return [c.value for c in children]
+
+
 
 
 class buildTree(lark.Visitor):
-    def __init__(self, tables, table_columns, foreign_keys, schemas):
+    def __init__(self, settings, tables, table_columns, foreign_keys, schemas):
         self.trees = {}
+        self.settings = settings
         self.tables = tables
         self.table_columns = table_columns
         self.foreign_keys = foreign_keys
@@ -401,19 +507,23 @@ def parse(settings, table_info, foreign_keys, query, aliases_only=False):
     parsed_alias = parse_alias(parsed)
     if parsed_alias:
         return (None, None, None, parsed_alias)
-    at = findAliases()
-    at.visit(parsed)
+
+    at = findAliases(settings, table_info, foreign_keys)
+    at.transform(parsed)
     local_aliases = at.aliases
     aliases = settings["aliases"].copy()
     aliases.update(local_aliases)
 
     if aliases_only:
         return aliases
+    # DEBUG
+    print("aliases are", aliases)
+    return None, None, None, aliases
 
     # TODO: We should use aliases in buildTree; that would simplify
     # things and let us use aliases before they're declared.  But
     # schemas complicate that, since we don't have them yet.
-    t = buildTree(tables, table_columns, foreign_keys, schemas)
+    t = buildTree(settings, tables, table_columns, foreign_keys, schemas)
     t.visit(parsed)
     return (t.trees, aliases, None, None)
 
@@ -622,6 +732,7 @@ def run_setting(settings, key, value):
 
 def run_command(settings, cur, table_info, keys, query, limit=100):
     tree, aliases, setting, alias = parse(settings, table_info, keys["foreign"], query)
+    return
     if setting:
         run_setting(settings, *setting)
         return
