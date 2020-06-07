@@ -182,8 +182,6 @@ class findAliases(lark.Transformer):
 
 
     def _add_aliases(self, elems):
-        print("Adding aliases for ", elems)
-
         first_elem = elems[0]
         path = []
 
@@ -230,7 +228,6 @@ class findAliases(lark.Transformer):
             next_round = []
             for ca in children_with_aliases:
                 # If any needed aliases are unresolved, put this one off.
-                print("Trying ", ca)
                 needed_aliases = ca[1]
                 if not all(a in self.aliases for a in needed_aliases):
                     next_round.append(ca)
@@ -815,10 +812,14 @@ class ScryCompleter(Completer):
         parts = component.split(".")
         if len(parts) > 1:
             prev_part = parts[-2]
-            prev_part = aliases.get(prev_part, prev_part)
+            if prev_part in aliases:
+                prev_part = aliases[prev_part][2]
             column_candidates = self.table_columns.get(prev_part, [])
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
+        else:
+            table_candidates += aliases.keys()
+
 
         candidates = sorted(column_candidates) + sorted(table_candidates)
         matches = [c for c in candidates if c.startswith(word)]
