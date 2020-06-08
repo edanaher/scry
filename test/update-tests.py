@@ -17,7 +17,7 @@ def parseadd(args):
     foreign_keys = scry.get_foreign_keys(cur)
     unique_keys = scry.get_unique_keys(cur)
     query = args.command
-    tree, aliases, command = scry.parse(table_info, foreign_keys, query)
+    tree, aliases, command, alias = scry.parse(scry.default_settings(), table_info, foreign_keys, query)
 
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 
@@ -75,7 +75,7 @@ def parseupdate(args):
     for instance in test_instances:
         name = instance.name
         query = instance.query
-        tree = scry.parse({"aliases":{}}, table_info, foreign_keys, query)
+        tree = scry.parse(scry.defaultSettings(), table_info, foreign_keys, query)
         if should_be_same("tree") and tree != instance.tree:
             raise Exception(f"Tree doesn't match for {name}\n\n{tree}\n\n{instance.tree}")
 

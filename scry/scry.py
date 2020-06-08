@@ -207,23 +207,27 @@ class findAliases(lark.Transformer):
             # TODO: Check for proper joins.
             # TODO: We should check that these aren't inconsistent.
 
+            # An alias definition.  Straightforward
+            if len(elem) == 2:
+                table, alias = elem
+
             # If it's just an alias...  it's fine.
             # TODO: As long as it's in the right place.
-            if len(elem) == 1 and elem[0] in aliases:
+            elif elem[0] in aliases:
                 path.append(elem[0])
                 continue
 
+            # If it's not a table, it must be a column
+            elif elem[0] not in self.table_columns:
+                continue
+
             # If it's not an alias, it implicity aliases to itself.
-            if len(elem) == 1 and elem[0] not in aliases:
+            else:
                 # This should never happen, I think?
                 if elem[0] in self.seen_aliases:
                     raise ScryException("Alias inconsistency.  Uh oh.")
                 table = elem[0]
                 alias = table
-
-            # An alias definition.  Straightforward
-            if len(elem) == 2:
-                table, alias = elem
 
             # TODO: Update the schema in case of cross-schema joins.
             # Actually add an alias
@@ -265,7 +269,6 @@ class findAliases(lark.Transformer):
     def condition(self, children):
         return (children[0][0], children[0][1])
 
-
     def condition_full_path(self, children):
         return (children[0], [], children[1])
 
@@ -298,6 +301,10 @@ class findAliases(lark.Transformer):
         return (table, alias)
 
     def columns(self, children):
+        # A trailing table is sometimes parsed as a columns.  So treat a singleton columns
+        # as if it were a table, and we'll fix it up later.
+        if len(children) == 1:
+            return (children[0].value,)
         return [c.value for c in children]
 
     def terminator(self, children):
@@ -421,8 +428,8 @@ class buildTree(lark.Transformer):
         elif isinstance(children[-1], list):
             alias = children[-2]
             columns = children[-1]
-        else :
-            if children[-1] in self.table_columns[self.aliases[None][children[-2]][2]]:
+        else:
+            if children[-1] in self.table_columns[self.aliases[None][children[-2]][2]] or children[-1] == "*":
                 alias = children[-2]
                 columns = [children[-1]]
             else:
@@ -492,6 +499,8 @@ class buildTree(lark.Transformer):
         return children[1].value
 
     def columns(self, children):
+        if len(children) == 1:
+            return children[0].value
         return [c.value for c in children]
 
     def terminator(self, children):
