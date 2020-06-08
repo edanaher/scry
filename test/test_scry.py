@@ -281,7 +281,7 @@ test_instances = [
         ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: Ted Chiang']
         ),
    Instance(
-        'simple chain with trailing table',
+        'regression test for simple chain with trailing table',
         'scry.authors.books',
         {'scry': {'children': {'authors': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['id', 'title', 'year', 'author_id']}}}}}},
         {'selects': [('scry.books.id', 'scry.authors.books.id'), ('scry.books.title', 'scry.authors.books.title'), ('scry.books.year', 'scry.authors.books.year'), ('scry.books.author_id', 'scry.authors.books.author_id')], 'joins': ['scry.authors', 'LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id'], 'wheres': [], 'uniques': [('scry.authors.id', 'scry.authors.id'), ('scry.books.id', 'scry.authors.books.id')]},
@@ -289,10 +289,17 @@ test_instances = [
         {'scry': {((None,), (None,)): {'authors': {((None,), (('id', 1),)): {'books': {((('id', 1), ('title', 'Fellowship of the Rings'), ('year', 1954), ('author_id', 1)), (('id', 1),)): {}, ((('id', 2), ('title', 'The Two Towers'), ('year', 1954), ('author_id', 1)), (('id', 2),)): {}, ((('id', 3), ('title', 'Return of the King'), ('year', 1955), ('author_id', 1)), (('id', 3),)): {}, ((('id', 7), ('title', 'Beowolf'), ('year', 2016), ('author_id', 1)), (('id', 7),)): {}}}, ((None,), (('id', 2),)): {'books': {((('id', 4), ('title', "Harry Potter and the Philosopher's Stone"), ('year', 1997), ('author_id', 2)), (('id', 4),)): {}, ((('id', 5), ('title', 'Harry Potter and the Prisoner of Azkaban'), ('year', 1999), ('author_id', 2)), (('id', 5),)): {}}}, ((None,), (('id', 3),)): {'books': {((('id', 6), ('title', 'Exhalation'), ('year', 2019), ('author_id', 3)), (('id', 6),)): {}}}}}}},
         ['- scry.authors.books.id: 1', '  scry.authors.books.title: Fellowship of the Rings', '  scry.authors.books.year: 1954', '  scry.authors.books.author_id: 1', '- scry.authors.books.id: 2', '  scry.authors.books.title: The Two Towers', '  scry.authors.books.year: 1954', '  scry.authors.books.author_id: 1', '- scry.authors.books.id: 3', '  scry.authors.books.title: Return of the King', '  scry.authors.books.year: 1955', '  scry.authors.books.author_id: 1', '- scry.authors.books.id: 7', '  scry.authors.books.title: Beowolf', '  scry.authors.books.year: 2016', '  scry.authors.books.author_id: 1', '- scry.authors.books.id: 4', "  scry.authors.books.title: Harry Potter and the Philosopher's Stone", '  scry.authors.books.year: 1997', '  scry.authors.books.author_id: 2', '- scry.authors.books.id: 5', '  scry.authors.books.title: Harry Potter and the Prisoner of Azkaban', '  scry.authors.books.year: 1999', '  scry.authors.books.author_id: 2', '- scry.authors.books.id: 6', '  scry.authors.books.title: Exhalation', '  scry.authors.books.year: 2019', '  scry.authors.books.author_id: 3']
         ),
+   Instance(
+        'regression test for query and condition on subtalbe',
+        'books.authors.name authors.name = "Ted Chiang"',
+        {'scry': {'children': {'books': {'table': 'books', 'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'conditions': [('name', '=', "'Ted Chiang'")]}}}}}}},
+        {'selects': [('scry.authors.name', 'scry.books.authors.name')], 'joins': ['scry.books', 'LEFT JOIN scry.authors ON scry.books.author_id = scry.authors.id'], 'wheres': ["scry.authors.name = 'Ted Chiang'"], 'uniques': [('scry.books.id', 'scry.books.id'), ('scry.authors.id', 'scry.books.authors.id')]},
+        "SELECT scry.books.id, scry.authors.id, scry.authors.name FROM scry.books LEFT JOIN scry.authors ON scry.books.author_id = scry.authors.id  WHERE scry.authors.name = 'Ted Chiang' LIMIT 100",
+        {'scry': {((None,), (None,)): {'books': {((None,), (('id', 6),)): {'authors': {((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}}}},
+        ['- scry.books.authors.name: Ted Chiang']
+        ),
     # End of instances
 ]
-#'books.title books.series_books.series.name series.name = "Harry Potter"'
-#'scry.authors.books'
 
 def run_test(instance):
     db = psycopg2.connect("")

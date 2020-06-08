@@ -476,7 +476,7 @@ class buildTree(lark.Transformer):
 
         ensure_exists(self.trees, schema, {})
         query_root = self.trees[schema]
-        prefix_node = self._find_prefix(query_root, prefix)
+        prefix_node = self._find_prefix(query_root, path + [prefix_tail])
 
 
         if suffix == []:
