@@ -33,6 +33,31 @@ error_instances = [
         "authors.series",
         "No known join of series to authors"
     ),
+    ErrorInstance(
+        "Unknown column",
+        "books.notacolumn",
+        "Unknown table or column: notacolumn"
+    ),
+    ErrorInstance(
+        "Column that doesn't exist on table",
+        "books.name",
+        "Unknown table or column: name"
+    ),
+    ErrorInstance(
+        "duplicated table in two parts of the tree",
+        "authors.books.authors.name authors.name",
+        "Existing alias authors for table authors on path '' reused on 'authors.books'"
+    ),
+    ErrorInstance(
+        "alias reused",
+        "authors.books@b b.series_books@b",
+        "Existing alias b for table books reused on series_books"
+    ),
+    ErrorInstance(
+        "alias used in wrong full path",
+        "authors.books@b series_books.b",
+        "Existing alias b for table books on path 'authors' reused on 'series_books'"
+    ),
 ]
 
 def run_test(instance):
@@ -64,6 +89,8 @@ def run_test(instance):
             assert str(e) == instance.error
     except scry.ScryException as e:
         assert str(e) == instance.error
+    else:
+        assert False, f"Exception expected: {instance.error}"
 
 @pytest.mark.parametrize("instance", error_instances, ids=lambda i: i.name)
 def test_errors(instance):

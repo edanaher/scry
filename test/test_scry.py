@@ -307,6 +307,15 @@ test_instances = [
         {'scry': {((None,), (None,)): {'b': {((('year', 1954), ('title', 'Fellowship of the Rings')), (('id', 1),)): {}, ((('year', 1954), ('title', 'The Two Towers')), (('id', 2),)): {}, ((('year', 1955), ('title', 'Return of the King')), (('id', 3),)): {}, ((('year', 1997), ('title', "Harry Potter and the Philosopher's Stone")), (('id', 4),)): {}, ((('year', 1999), ('title', 'Harry Potter and the Prisoner of Azkaban')), (('id', 5),)): {}, ((('year', 2019), ('title', 'Exhalation')), (('id', 6),)): {}, ((('year', 2016), ('title', 'Beowolf')), (('id', 7),)): {}}}}},
         ['- scry.b.year: 1954', '  scry.b.title: Fellowship of the Rings', '- scry.b.year: 1954', '  scry.b.title: The Two Towers', '- scry.b.year: 1955', '  scry.b.title: Return of the King', '- scry.b.year: 1997', "  scry.b.title: Harry Potter and the Philosopher's Stone", '- scry.b.year: 1999', '  scry.b.title: Harry Potter and the Prisoner of Azkaban', '- scry.b.year: 2019', '  scry.b.title: Exhalation', '- scry.b.year: 2016', '  scry.b.title: Beowolf']
         ),
+   Instance(
+        'alias used in a correct full path',
+        'authors.books@b.title authors.b.year',
+        {'scry': {'children': {'authors': {'table': 'authors', 'children': {'b': {'table': 'books', 'columns': ['title', 'year']}}}}}},
+        {'selects': [('b.title', 'scry.authors.books.title'), ('b.year', 'scry.authors.books.year')], 'joins': ['scry.authors', 'LEFT JOIN scry.books AS b ON scry.authors.id = b.author_id'], 'wheres': [], 'uniques': [('scry.authors.id', 'scry.authors.id'), ('b.id', 'scry.authors.books.id')]},
+        'SELECT scry.authors.id, b.id, b.title, b.year FROM scry.authors LEFT JOIN scry.books AS b ON scry.authors.id = b.author_id  LIMIT 100',
+        {'scry': {((None,), (None,)): {'authors': {((None,), (('id', 1),)): {'books': {((('title', 'Fellowship of the Rings'), ('year', 1954)), (('id', 1),)): {}, ((('title', 'The Two Towers'), ('year', 1954)), (('id', 2),)): {}, ((('title', 'Return of the King'), ('year', 1955)), (('id', 3),)): {}, ((('title', 'Beowolf'), ('year', 2016)), (('id', 7),)): {}}}, ((None,), (('id', 2),)): {'books': {((('title', "Harry Potter and the Philosopher's Stone"), ('year', 1997)), (('id', 4),)): {}, ((('title', 'Harry Potter and the Prisoner of Azkaban'), ('year', 1999)), (('id', 5),)): {}}}, ((None,), (('id', 3),)): {'books': {((('title', 'Exhalation'), ('year', 2019)), (('id', 6),)): {}}}}}}},
+        ['- scry.authors.books.title: Fellowship of the Rings', '  scry.authors.books.year: 1954', '- scry.authors.books.title: The Two Towers', '  scry.authors.books.year: 1954', '- scry.authors.books.title: Return of the King', '  scry.authors.books.year: 1955', '- scry.authors.books.title: Beowolf', '  scry.authors.books.year: 2016', "- scry.authors.books.title: Harry Potter and the Philosopher's Stone", '  scry.authors.books.year: 1997', '- scry.authors.books.title: Harry Potter and the Prisoner of Azkaban', '  scry.authors.books.year: 1999', '- scry.authors.books.title: Exhalation', '  scry.authors.books.year: 2019']
+        ),
     # End of instances
 ]
 

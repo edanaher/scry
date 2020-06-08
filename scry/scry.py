@@ -204,9 +204,6 @@ class findAliases(lark.Transformer):
             if isinstance(elem, list):
                 continue
 
-            # TODO: Check for proper joins.
-            # TODO: We should check that these aren't inconsistent.
-
             # An alias definition.  Straightforward
             if len(elem) == 2:
                 table, alias = elem
@@ -214,8 +211,8 @@ class findAliases(lark.Transformer):
             # If it's just an alias...  it's fine.
             # TODO: As long as it's in the right place.
             elif elem[0] in aliases:
-                path.append(elem[0])
-                continue
+                alias = elem[0]
+                _, _, table = aliases[alias]
 
             # If it's not a table, it must be a column
             elif elem[0] not in self.table_columns:
@@ -240,9 +237,20 @@ class findAliases(lark.Transformer):
                     raise ScryException(f"No known join of {table} to {path[-1]}")
 
 
+            # Check that the alias doesn't already exist somewhere else
+            if alias in aliases:
+                s, p, t = aliases[alias]
+                if schema != s:
+                    raise ScryException(f"Existing alias {alias} on schema {s} reused on {schema}")
+                if table != t:
+                    raise ScryException(f"Existing alias {alias} for table {t} reused on {table}")
+                if path != p:
+                    raise ScryException(f"Existing alias {alias} for table {t} on path '{'('.join(p)}' reused on '{'.'.join(path)}'")
+            else:
+                aliases[alias] = (schema, path.copy(), table)
+
             # TODO: Update the schema in case of cross-schema joins.
             # Actually add an alias
-            aliases[alias] = (schema, path.copy(), table)
             path.append(alias)
 
     def query(self, children):
