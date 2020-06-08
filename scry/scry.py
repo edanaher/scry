@@ -939,8 +939,8 @@ def main():
                 print("\n".join(output))
         except ScryException as e:
             print(e)
-#        except lark.exceptions.LarkError as e:
-#            print(e)
+        except lark.exceptions.LarkError as e:
+            print(e)
     else:
         repl(settings, cur, table_info, keys)
 
