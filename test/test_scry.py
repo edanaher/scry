@@ -328,7 +328,7 @@ def run_test(instance):
     output = scry.format_results(results)
     assert output == instance.output
 
-@pytest.mark.parametrize("instance", test_instances)
+@pytest.mark.parametrize("instance", test_instances, ids=lambda i: i.name)
 def test_scry(instance):
     run_test(instance)
 

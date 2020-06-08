@@ -219,6 +219,9 @@ class findAliases(lark.Transformer):
 
             # If it's not a table, it must be a column
             elif elem[0] not in self.table_columns:
+                _, _, t = aliases[path[-1]]
+                if elem[0] not in self.table_columns[t] and elem[0] != "*":
+                    raise ScryException(f"Unknown table or column: {elem[0]}")
                 continue
 
             # If it's not an alias, it implicity aliases to itself.
@@ -226,6 +229,8 @@ class findAliases(lark.Transformer):
                 # This should never happen, I think?
                 if elem[0] in self.seen_aliases:
                     raise ScryException("Alias inconsistency.  Uh oh.")
+                if elem[0] not in self.table_columns:
+                    raise ScryException(f"Unknown table: {table}")
                 table = elem[0]
                 alias = table
 
@@ -949,7 +954,10 @@ def main():
         except ScryException as e:
             print(e)
         except lark.exceptions.LarkError as e:
-            print(e)
+            if isinstance(e.__context__, ScryException):
+                print(e.__context__)
+            else:
+                print(e)
     else:
         repl(settings, cur, table_info, keys)
 
