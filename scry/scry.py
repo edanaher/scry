@@ -28,7 +28,7 @@ def default_settings():
             "complete_style": "column",
             "search_path": "scry,public,information_schema"
         },
-        "aliases": {}
+        "aliases": {},
     }
 
 def get_table_info(cur):
@@ -154,7 +154,7 @@ class findAliases(lark.Transformer):
         self.table_columns = table_columns
         self.foreign_keys = foreign_keys
         self.seen_aliases = set()
-        self.aliases = {}
+        self.aliases = { None: {}}
 
     def _schema_for_table(self, table):
         if table in self.aliases:
@@ -181,12 +181,13 @@ class findAliases(lark.Transformer):
         return needed
 
 
-    def _add_aliases(self, elems):
+    def _add_aliases(self, prefix, elems):
+        aliases = self.aliases[prefix]
         first_elem = elems[0]
         path = []
 
-        if first_elem[0] in self.aliases:
-            s, p, t = self.aliases[first_elem[0]]
+        if first_elem[0] in aliases:
+            s, p, t = aliases[first_elem[0]]
             schema = s
             path = p.copy()
         # Can't alias schemas yet
@@ -208,12 +209,12 @@ class findAliases(lark.Transformer):
 
             # If it's just an alias...  it's fine.
             # TODO: As long as it's in the right place.
-            if len(elem) == 1 and elem[0] in self.aliases:
+            if len(elem) == 1 and elem[0] in aliases:
                 path.append(elem[0])
                 continue
 
             # If it's not an alias, it implicity aliases to itself.
-            if len(elem) == 1 and elem[0] not in self.aliases:
+            if len(elem) == 1 and elem[0] not in aliases:
                 # This should never happen, I think?
                 if elem[0] in self.seen_aliases:
                     raise ScryException("Alias inconsistency.  Uh oh.")
@@ -226,15 +227,15 @@ class findAliases(lark.Transformer):
 
             # TODO: Update the schema in case of cross-schema joins.
             # Actually add an alias
-            self.aliases[alias] = (schema, path.copy(), table)
+            aliases[alias] = (schema, path.copy(), table)
             path.append(alias)
 
     def query(self, children):
         # Filter out whitespace
-        children = [c for c in children if isinstance(c, list)]
+        children = [c for c in children if isinstance(c, tuple)]
 
         # Tag queries with what aliases they need before they can be resolved
-        children_with_aliases = [(c, self._aliases_needed_for_path(c)) for c in children]
+        children_with_aliases = [(c[0], self._aliases_needed_for_path(c[0])) for c in children]
 
         updated_one = True
         while children_with_aliases and updated_one:
@@ -243,18 +244,26 @@ class findAliases(lark.Transformer):
             for ca in children_with_aliases:
                 # If any needed aliases are unresolved, put this one off.
                 needed_aliases = ca[1]
-                if not all(a in self.aliases for a in needed_aliases):
+                if not all(a in self.aliases[None] for a in needed_aliases):
                     next_round.append(ca)
                     continue
 
                 # Add aliases for thie query, since we have everything we need.
-                self._add_aliases(ca[0])
+                self._add_aliases(None, ca[0])
                 updated_one = True
             children_with_aliases = next_round
 
+        if children_with_aliases:
+            raise ScryException("Unfinished aliases:", children_with_aliases)
+
+        deep_conditions = [(c[0][-1][-1], c[1]) for c in children if c[1]]
+        # TODO: Handle actual aliases here(?!)
+        for t, c in deep_conditions:
+            ensure_exists(self.aliases, t, {})
+            self._add_aliases(t, c)
+
     def condition(self, children):
-        # The prefix is basically a query.
-        return children[0][0]
+        return (children[0][0], children[0][1])
 
 
     def condition_full_path(self, children):
@@ -276,7 +285,7 @@ class findAliases(lark.Transformer):
         return children[0]
 
     def query_path(self, children):
-        return children
+        return (children, [])
 
     def path_elem(self, children):
         # No alias
@@ -313,7 +322,7 @@ class buildTree(lark.Transformer):
         # An alias definition; look up what it resolved to and return it.
         if len(tree.children) > 1:
             alias = tree.children[1].value
-            schema, path, table = aliases[alias]
+            schema, path, table = aliases[None][alias]
             return (schema, table, alias)
 
         # Otherwise just look up the table.
@@ -321,7 +330,7 @@ class buildTree(lark.Transformer):
             raise ScryException(f"Table {table} not found in aliases.  Uh oh.")
 
         alias = tree.children[0].value
-        schema, path, table = aliases[alias]
+        schema, path, table = aliases[None][alias]
         return (schema, table, alias)
 
     def _split_path(self, tree):
@@ -332,7 +341,7 @@ class buildTree(lark.Transformer):
             explicit_schema = True
             children = tree.children[1:]
         else:
-            if first_name not in self.aliases:
+            if first_name not in self.aliases[None]:
                 if first_name not in self.tables:
                     raise ScryException(f"Unknown table: {first_name}")
                 if len(self.tables[first_name]) > 1:
@@ -398,7 +407,7 @@ class buildTree(lark.Transformer):
         (alias, *rprefix) = prefix
         ensure_exists(tree, "children", alias, {})
         if "table" not in tree["children"][alias]:
-            _, _, table = self.aliases[alias]
+            _, _, table = self.aliases[None][alias]
             tree["children"][alias]["table"] = table
         return self._find_prefix(tree["children"][alias], rprefix)
 
@@ -413,14 +422,14 @@ class buildTree(lark.Transformer):
             alias = children[-2]
             columns = children[-1]
         else :
-            if children[-1] in self.table_columns[self.aliases[children[-2]][2]]:
+            if children[-1] in self.table_columns[self.aliases[None][children[-2]][2]]:
                 alias = children[-2]
                 columns = [children[-1]]
             else:
                 alias = children[-1]
                 columns = ["*"]
 
-        schema, path, table = self.aliases[alias]
+        schema, path, table = self.aliases[None][alias]
 
         ensure_exists(self.trees, schema, {})
         query_root = self.trees[schema]
@@ -449,13 +458,14 @@ class buildTree(lark.Transformer):
                 ensure_exists(tree, "conditions", [])
                 tree["conditions"].append((column, op, value))
                 return
-            (table, alias), *rsuffix = suffix
+            alias, *rsuffix = suffix
+            _, _, table = self.aliases[prefix_tail][alias]
             ensure_exists(tree, "children", alias, {})
             tree["children"][alias]["table"] = table
             addConstraint(tree["children"][alias], rsuffix)
 
         prefix_tail = prefix[-1]
-        schema, path, table = self.aliases[prefix_tail]
+        schema, path, table = self.aliases[None][prefix_tail]
 
         ensure_exists(self.trees, schema, {})
         query_root = self.trees[schema]
@@ -468,7 +478,7 @@ class buildTree(lark.Transformer):
         else:
             a, *ts = suffix
             ensure_exists(prefix_node, "conditions", "children", a, {})
-            _, _, t = self.aliases[a]
+            _, _, t = self.aliases[prefix[-1]][a]
             prefix_node["conditions"]["children"][a]["table"] = t
             addConstraint(prefix_node["conditions"]["children"][a], ts)
 

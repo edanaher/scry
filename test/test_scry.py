@@ -118,60 +118,60 @@ test_instances = [
         {'scry': {((None,), (None,)): {'b': {((('title', 'Fellowship of the Rings'),), (('id', 1),)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}}}, ((('title', 'The Two Towers'),), (('id', 2),)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}}}, ((('title', 'Return of the King'),), (('id', 3),)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}}}, ((('title', "Harry Potter and the Philosopher's Stone"),), (('id', 4),)): {'authors': {((('name', 'J.K. Rowling'),), (('id', 2),)): {}}}, ((('title', 'Harry Potter and the Prisoner of Azkaban'),), (('id', 5),)): {'authors': {((('name', 'J.K. Rowling'),), (('id', 2),)): {}}}, ((('title', 'Exhalation'),), (('id', 6),)): {'authors': {((('name', 'Ted Chiang'),), (('id', 3),)): {}}}, ((('title', 'Beowolf'),), (('id', 7),)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}}}}}}},
         ['- scry.b.title: Fellowship of the Rings', '  - authors.name: J.R.R. Tolkien', '- scry.b.title: The Two Towers', '  - authors.name: J.R.R. Tolkien', '- scry.b.title: Return of the King', '  - authors.name: J.R.R. Tolkien', "- scry.b.title: Harry Potter and the Philosopher's Stone", '  - authors.name: J.K. Rowling', '- scry.b.title: Harry Potter and the Prisoner of Azkaban', '  - authors.name: J.K. Rowling', '- scry.b.title: Exhalation', '  - authors.name: Ted Chiang', '- scry.b.title: Beowolf', '  - authors.name: J.R.R. Tolkien']
         ),
-#    Instance(
-#        'simple conditional',
-#        'scry.books.year books.title = "Fellowship of the Rings"',
-#        {'scry': {'children': {'books': {'table': 'books', 'columns': ['year'], 'conditions': {'conditions': [('title', '=', "'Fellowship of the Rings'")]}}}}},
-#        {'selects': [('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': ["scry.books.title = 'Fellowship of the Rings'"], 'uniques': [('scry.books.id', 'scry.books.id')]},
-#        "SELECT scry.books.id, scry.books.year FROM scry.books  WHERE scry.books.title = 'Fellowship of the Rings' LIMIT 100",
-#        {'scry': {((None,), (None,)): {'books': {((('year', 1954),), (('id', 1),)): {}}}}},
-#        ['- scry.books.year: 1954']
-#        ),
-#    Instance(
-#        'simple conditional using alias',
-#        'scry.books@b.year b.title = "Fellowship of the Rings"',
-#        {'scry': {'children': {'b': {'table': 'books', 'columns': ['year'], 'conditions': {'conditions': [('title', '=', "'Fellowship of the Rings'")]}}}}},
-#        {'selects': [('b.year', 'scry.b.year')], 'joins': ['scry.books AS b'], 'wheres': ["b.title = 'Fellowship of the Rings'"], 'uniques': [('b.id', 'scry.b.id')]},
-#        "SELECT b.id, b.year FROM scry.books AS b  WHERE b.title = 'Fellowship of the Rings' LIMIT 100",
-#        {'scry': {((None,), (None,)): {'b': {((('year', 1954),), (('id', 1),)): {}}}}},
-#        ['- scry.b.year: 1954']
-#        ),
-#    Instance(
-#        'child conditional with alias',
-#        'scry.books@b.title,year b.authors.name = "J.R.R. Tolkien"',
-#        {'scry': {'children': {'b': {'table': 'books', 'columns': ['title', 'year'], 'children': {'authors': {'table': 'authors', 'conditions': {'conditions': [('name', '=', "'J.R.R. Tolkien'")]}}}}}}},
-#        {'selects': [('b.title', 'scry.b.title'), ('b.year', 'scry.b.year')], 'joins': ['scry.books AS b', 'LEFT JOIN scry.authors ON b.author_id = scry.authors.id'], 'wheres': ["scry.authors.name = 'J.R.R. Tolkien'"], 'uniques': [('b.id', 'scry.b.id'), ('scry.authors.id', 'scry.b.authors.id')]},
-#        "SELECT b.id, scry.authors.id, b.title, b.year FROM scry.books AS b LEFT JOIN scry.authors ON b.author_id = scry.authors.id  WHERE scry.authors.name = 'J.R.R. Tolkien' LIMIT 100",
-#        {'scry': {((None,), (None,)): {'b': {((('title', 'Fellowship of the Rings'), ('year', 1954)), (('id', 1),)): {'authors': {((None,), (('id', 1),)): {}}}, ((('title', 'The Two Towers'), ('year', 1954)), (('id', 2),)): {'authors': {((None,), (('id', 1),)): {}}}, ((('title', 'Return of the King'), ('year', 1955)), (('id', 3),)): {'authors': {((None,), (('id', 1),)): {}}}, ((('title', 'Beowolf'), ('year', 2016)), (('id', 7),)): {'authors': {((None,), (('id', 1),)): {}}}}}}},
-#        ['- scry.b.title: Fellowship of the Rings', '  scry.b.year: 1954', '- scry.b.title: The Two Towers', '  scry.b.year: 1954', '- scry.b.title: Return of the King', '  scry.b.year: 1955', '- scry.b.title: Beowolf', '  scry.b.year: 2016']
-#        ),
-#    Instance(
-#        'deep conditional',
-#        'scry.authors@a.books.title a.books.series_books.series.name = "Lord of the Rings"',
-#        {'scry': {'children': {'a': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['title'], 'children': {'series_books': {'table': 'series_books', 'children': {'series': {'table': 'series', 'conditions': {'conditions': [('name', '=', "'Lord of the Rings'")]}}}}}}}}}}},
-#        {'selects': [('scry.books.title', 'scry.a.books.title')], 'joins': ['scry.authors AS a', 'LEFT JOIN scry.books ON a.id = scry.books.author_id', 'LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id', 'LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id'], 'wheres': ["scry.series.name = 'Lord of the Rings'"], 'uniques': [('a.id', 'scry.a.id'), ('scry.books.id', 'scry.a.books.id'), ('scry.series.id', 'scry.a.books.series_books.series.id')]},
-#        "SELECT a.id, scry.books.id, scry.series.id, scry.books.title FROM scry.authors AS a LEFT JOIN scry.books ON a.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id  WHERE scry.series.name = 'Lord of the Rings' LIMIT 100",
-#        {'scry': {((None,), (None,)): {'a': {((None,), (('id', 1),)): {'books': {((('title', 'Fellowship of the Rings'),), (('id', 1),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', 'The Two Towers'),), (('id', 2),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', 'Return of the King'),), (('id', 3),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}}}}}}},
-#        ['- scry.a.books.title: Fellowship of the Rings', '- scry.a.books.title: The Two Towers', '- scry.a.books.title: Return of the King']
-#        ),
-#    Instance(
-#        'deep conditional on prefix',
-#        'scry.authors.books.title authors:books.series_books.series.name = "Lord of the Rings"',
-#        {'scry': {'children': {'authors': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['title']}}, 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'children': {'series': {'table': 'series', 'conditions': [('name', '=', "'Lord of the Rings'")]}}}}}}}}}}},
-#        {'selects': [('scry.books.title', 'scry.authors.books.title')], 'joins': ['scry.authors', 'LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id'], 'wheres': ["authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings')"], 'uniques': [('scry.authors.id', 'scry.authors.id'), ('scry.books.id', 'scry.authors.books.id')]},
-#        "SELECT scry.authors.id, scry.books.id, scry.books.title FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings') LIMIT 100",
-#        {'scry': {((None,), (None,)): {'authors': {((None,), (('id', 1),)): {'books': {((('title', 'Fellowship of the Rings'),), (('id', 1),)): {}, ((('title', 'The Two Towers'),), (('id', 2),)): {}, ((('title', 'Return of the King'),), (('id', 3),)): {}, ((('title', 'Beowolf'),), (('id', 7),)): {}}}}}}},
-#        ['- scry.authors.books.title: Fellowship of the Rings', '- scry.authors.books.title: The Two Towers', '- scry.authors.books.title: Return of the King', '- scry.authors.books.title: Beowolf']
-#        ),
-#    Instance(
-#        'deep conditional on prefix with alias',
-#        'scry.authors@a.books.title a:books.series_books.series.name = "Lord of the Rings"',
-#        {'scry': {'children': {'a': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['title']}}, 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'children': {'series': {'table': 'series', 'conditions': [('name', '=', "'Lord of the Rings'")]}}}}}}}}}}},
-#        {'selects': [('scry.books.title', 'scry.a.books.title')], 'joins': ['scry.authors AS a', 'LEFT JOIN scry.books ON a.id = scry.books.author_id'], 'wheres': ["a.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON a.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings')"], 'uniques': [('a.id', 'scry.a.id'), ('scry.books.id', 'scry.a.books.id')]},
-#        "SELECT a.id, scry.books.id, scry.books.title FROM scry.authors AS a LEFT JOIN scry.books ON a.id = scry.books.author_id  WHERE a.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON a.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings') LIMIT 100",
-#        {'scry': {((None,), (None,)): {'a': {((None,), (('id', 1),)): {'books': {((('title', 'Beowolf'),), (('id', 7),)): {}, ((('title', 'Return of the King'),), (('id', 3),)): {}, ((('title', 'The Two Towers'),), (('id', 2),)): {}, ((('title', 'Fellowship of the Rings'),), (('id', 1),)): {}}}}}}},
-#        ['- scry.a.books.title: Beowolf', '- scry.a.books.title: Return of the King', '- scry.a.books.title: The Two Towers', '- scry.a.books.title: Fellowship of the Rings']
-#        ),
+    Instance(
+        'simple conditional',
+        'scry.books.year books.title = "Fellowship of the Rings"',
+        {'scry': {'children': {'books': {'table': 'books', 'columns': ['year'], 'conditions': {'conditions': [('title', '=', "'Fellowship of the Rings'")]}}}}},
+        {'selects': [('scry.books.year', 'scry.books.year')], 'joins': ['scry.books'], 'wheres': ["scry.books.title = 'Fellowship of the Rings'"], 'uniques': [('scry.books.id', 'scry.books.id')]},
+        "SELECT scry.books.id, scry.books.year FROM scry.books  WHERE scry.books.title = 'Fellowship of the Rings' LIMIT 100",
+        {'scry': {((None,), (None,)): {'books': {((('year', 1954),), (('id', 1),)): {}}}}},
+        ['- scry.books.year: 1954']
+        ),
+    Instance(
+        'simple conditional using alias',
+        'scry.books@b.year b.title = "Fellowship of the Rings"',
+        {'scry': {'children': {'b': {'table': 'books', 'columns': ['year'], 'conditions': {'conditions': [('title', '=', "'Fellowship of the Rings'")]}}}}},
+        {'selects': [('b.year', 'scry.b.year')], 'joins': ['scry.books AS b'], 'wheres': ["b.title = 'Fellowship of the Rings'"], 'uniques': [('b.id', 'scry.b.id')]},
+        "SELECT b.id, b.year FROM scry.books AS b  WHERE b.title = 'Fellowship of the Rings' LIMIT 100",
+        {'scry': {((None,), (None,)): {'b': {((('year', 1954),), (('id', 1),)): {}}}}},
+        ['- scry.b.year: 1954']
+        ),
+    Instance(
+        'child conditional with alias',
+        'scry.books@b.title,year b.authors.name = "J.R.R. Tolkien"',
+        {'scry': {'children': {'b': {'table': 'books', 'columns': ['title', 'year'], 'children': {'authors': {'table': 'authors', 'conditions': {'conditions': [('name', '=', "'J.R.R. Tolkien'")]}}}}}}},
+        {'selects': [('b.title', 'scry.b.title'), ('b.year', 'scry.b.year')], 'joins': ['scry.books AS b', 'LEFT JOIN scry.authors ON b.author_id = scry.authors.id'], 'wheres': ["scry.authors.name = 'J.R.R. Tolkien'"], 'uniques': [('b.id', 'scry.b.id'), ('scry.authors.id', 'scry.b.authors.id')]},
+        "SELECT b.id, scry.authors.id, b.title, b.year FROM scry.books AS b LEFT JOIN scry.authors ON b.author_id = scry.authors.id  WHERE scry.authors.name = 'J.R.R. Tolkien' LIMIT 100",
+        {'scry': {((None,), (None,)): {'b': {((('title', 'Fellowship of the Rings'), ('year', 1954)), (('id', 1),)): {'authors': {((None,), (('id', 1),)): {}}}, ((('title', 'The Two Towers'), ('year', 1954)), (('id', 2),)): {'authors': {((None,), (('id', 1),)): {}}}, ((('title', 'Return of the King'), ('year', 1955)), (('id', 3),)): {'authors': {((None,), (('id', 1),)): {}}}, ((('title', 'Beowolf'), ('year', 2016)), (('id', 7),)): {'authors': {((None,), (('id', 1),)): {}}}}}}},
+        ['- scry.b.title: Fellowship of the Rings', '  scry.b.year: 1954', '- scry.b.title: The Two Towers', '  scry.b.year: 1954', '- scry.b.title: Return of the King', '  scry.b.year: 1955', '- scry.b.title: Beowolf', '  scry.b.year: 2016']
+        ),
+    Instance(
+        'deep conditional',
+        'scry.authors@a.books.title a.books.series_books.series.name = "Lord of the Rings"',
+        {'scry': {'children': {'a': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['title'], 'children': {'series_books': {'table': 'series_books', 'children': {'series': {'table': 'series', 'conditions': {'conditions': [('name', '=', "'Lord of the Rings'")]}}}}}}}}}}},
+        {'selects': [('scry.books.title', 'scry.a.books.title')], 'joins': ['scry.authors AS a', 'LEFT JOIN scry.books ON a.id = scry.books.author_id', 'LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id', 'LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id'], 'wheres': ["scry.series.name = 'Lord of the Rings'"], 'uniques': [('a.id', 'scry.a.id'), ('scry.books.id', 'scry.a.books.id'), ('scry.series.id', 'scry.a.books.series_books.series.id')]},
+        "SELECT a.id, scry.books.id, scry.series.id, scry.books.title FROM scry.authors AS a LEFT JOIN scry.books ON a.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id  WHERE scry.series.name = 'Lord of the Rings' LIMIT 100",
+        {'scry': {((None,), (None,)): {'a': {((None,), (('id', 1),)): {'books': {((('title', 'Fellowship of the Rings'),), (('id', 1),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', 'The Two Towers'),), (('id', 2),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', 'Return of the King'),), (('id', 3),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}}}}}}},
+        ['- scry.a.books.title: Fellowship of the Rings', '- scry.a.books.title: The Two Towers', '- scry.a.books.title: Return of the King']
+        ),
+    Instance(
+        'deep conditional on prefix',
+        'scry.authors.books.title authors:books.series_books.series.name = "Lord of the Rings"',
+        {'scry': {'children': {'authors': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['title']}}, 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'children': {'series': {'table': 'series', 'conditions': [('name', '=', "'Lord of the Rings'")]}}}}}}}}}}},
+        {'selects': [('scry.books.title', 'scry.authors.books.title')], 'joins': ['scry.authors', 'LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id'], 'wheres': ["authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings')"], 'uniques': [('scry.authors.id', 'scry.authors.id'), ('scry.books.id', 'scry.authors.books.id')]},
+        "SELECT scry.authors.id, scry.books.id, scry.books.title FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings') LIMIT 100",
+        {'scry': {((None,), (None,)): {'authors': {((None,), (('id', 1),)): {'books': {((('title', 'Fellowship of the Rings'),), (('id', 1),)): {}, ((('title', 'The Two Towers'),), (('id', 2),)): {}, ((('title', 'Return of the King'),), (('id', 3),)): {}, ((('title', 'Beowolf'),), (('id', 7),)): {}}}}}}},
+        ['- scry.authors.books.title: Fellowship of the Rings', '- scry.authors.books.title: The Two Towers', '- scry.authors.books.title: Return of the King', '- scry.authors.books.title: Beowolf']
+        ),
+    Instance(
+        'deep conditional on prefix with alias',
+        'scry.authors@a.books.title a:books.series_books.series.name = "Lord of the Rings"',
+        {'scry': {'children': {'a': {'table': 'authors', 'children': {'books': {'table': 'books', 'columns': ['title']}}, 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'children': {'series': {'table': 'series', 'conditions': [('name', '=', "'Lord of the Rings'")]}}}}}}}}}}},
+        {'selects': [('scry.books.title', 'scry.a.books.title')], 'joins': ['scry.authors AS a', 'LEFT JOIN scry.books ON a.id = scry.books.author_id'], 'wheres': ["a.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON a.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings')"], 'uniques': [('a.id', 'scry.a.id'), ('scry.books.id', 'scry.a.books.id')]},
+        "SELECT a.id, scry.books.id, scry.books.title FROM scry.authors AS a LEFT JOIN scry.books ON a.id = scry.books.author_id  WHERE a.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON a.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id LEFT JOIN scry.series ON scry.series_books.series_id = scry.series.id WHERE scry.series.name = 'Lord of the Rings') LIMIT 100",
+        {'scry': {((None,), (None,)): {'a': {((None,), (('id', 1),)): {'books': {((('title', 'Beowolf'),), (('id', 7),)): {}, ((('title', 'Return of the King'),), (('id', 3),)): {}, ((('title', 'The Two Towers'),), (('id', 2),)): {}, ((('title', 'Fellowship of the Rings'),), (('id', 1),)): {}}}}}}},
+        ['- scry.a.books.title: Beowolf', '- scry.a.books.title: Return of the King', '- scry.a.books.title: The Two Towers', '- scry.a.books.title: Fellowship of the Rings']
+        ),
     Instance(
         'Terminator to select no fields',
         'scry.authors@a., a.name',
@@ -253,36 +253,37 @@ test_instances = [
         {'scry': {((None,), (None,)): {'books': {((('title', 'Fellowship of the Rings'),), (('id', 1),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', 'The Two Towers'),), (('id', 2),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', 'Return of the King'),), (('id', 3),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 1),)): {}}}}}, ((('title', "Harry Potter and the Philosopher's Stone"),), (('id', 4),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 2),)): {}}}}}, ((('title', 'Harry Potter and the Prisoner of Azkaban'),), (('id', 5),)): {'series_books': {((None,), (None,)): {'series': {((None,), (('id', 2),)): {}}}}}}}}},
         ['- scry.books.title: Fellowship of the Rings', '- scry.books.title: The Two Towers', '- scry.books.title: Return of the King', "- scry.books.title: Harry Potter and the Philosopher's Stone", '- scry.books.title: Harry Potter and the Prisoner of Azkaban']
         ),
-#   Instance(
-#        'deep condition on a NULL field',
-#        'authors.name authors:books.series_books.series_id = NULL',
-#        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '=', 'NULL')]}}}}}}}}},
-#        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
-#        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL) LIMIT 100',
-#        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
-#        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: Ted Chiang']
-#        ),
-#   Instance(
-#        'deep condition on a not NULL field',
-#        'authors.name authors:books.series_books.series_id <> NULL',
-#        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '<>', 'NULL')]}}}}}}}}},
-#        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NOT NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
-#        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NOT NULL) LIMIT 100',
-#        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}}}}},
-#        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: J.K. Rowling']
-#        ),
-#   Instance(
-#        'deep condition on a NULL field',
-#        'authors.name authors:books.series_books.series_id = NULL',
-#        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '=', 'NULL')]}}}}}}}}},
-#        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
-#        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL) LIMIT 100',
-#        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
-#        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: Ted Chiang']
-#        ),
+   Instance(
+        'deep condition on a NULL field',
+        'authors.name authors:books.series_books.series_id = NULL',
+        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '=', 'NULL')]}}}}}}}}},
+        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
+        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL) LIMIT 100',
+        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
+        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: Ted Chiang']
+        ),
+   Instance(
+        'deep condition on a not NULL field',
+        'authors.name authors:books.series_books.series_id <> NULL',
+        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '<>', 'NULL')]}}}}}}}}},
+        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NOT NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
+        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NOT NULL) LIMIT 100',
+        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'J.K. Rowling'),), (('id', 2),)): {}}}}},
+        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: J.K. Rowling']
+        ),
+   Instance(
+        'deep condition on a NULL field',
+        'authors.name authors:books.series_books.series_id = NULL',
+        {'scry': {'children': {'authors': {'table': 'authors', 'columns': ['name'], 'conditions': {'children': {'books': {'table': 'books', 'children': {'series_books': {'table': 'series_books', 'conditions': [('series_id', '=', 'NULL')]}}}}}}}}},
+        {'selects': [('scry.authors.name', 'scry.authors.name')], 'joins': ['scry.authors'], 'wheres': ['authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL)'], 'uniques': [('scry.authors.id', 'scry.authors.id')]},
+        'SELECT scry.authors.id, scry.authors.name FROM scry.authors  WHERE authors.id IN (SELECT scry.authors.id FROM scry.authors LEFT JOIN scry.books ON scry.authors.id = scry.books.author_id LEFT JOIN scry.series_books ON scry.books.id = scry.series_books.book_id WHERE scry.series_books.series_id IS NULL) LIMIT 100',
+        {'scry': {((None,), (None,)): {'authors': {((('name', 'J.R.R. Tolkien'),), (('id', 1),)): {}, ((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}},
+        ['- scry.authors.name: J.R.R. Tolkien', '- scry.authors.name: Ted Chiang']
+        ),
     # End of instances
 ]
 #'books.title books.series_books.series.name series.name = "Harry Potter"'
+#'scry.authors.books'
 
 def run_test(instance):
     db = psycopg2.connect("")
