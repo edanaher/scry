@@ -904,15 +904,15 @@ class ScryCompleter(Completer):
         if len(parts) > 1:
             prev_part = parts[-2]
             if prev_part in aliases:
-                prev_part = aliases[prev_part][2]
+                prev_part = aliases[None][prev_part][2]
             column_candidates = self.table_columns.get(prev_part, [])
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
         else:
-            table_candidates += aliases.keys()
+            table_candidates += aliases.get(None, [])
 
 
-        candidates = sorted(column_candidates) + sorted(table_candidates)
+        candidates = sorted(column_candidates) + sorted(list(set(table_candidates)))
         matches = [c for c in candidates if c.startswith(word)]
         return [Completion(c, -len(word)) for c in matches]
 
