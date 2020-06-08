@@ -234,6 +234,12 @@ class findAliases(lark.Transformer):
                 table = elem[0]
                 alias = table
 
+            if path:
+                _, _, last_table = aliases[path[-1]]
+                if table not in self.foreign_keys[last_table][schema]:
+                    raise ScryException(f"No known join of {table} to {path[-1]}")
+
+
             # TODO: Update the schema in case of cross-schema joins.
             # Actually add an alias
             aliases[alias] = (schema, path.copy(), table)

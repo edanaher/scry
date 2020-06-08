@@ -28,6 +28,11 @@ error_instances = [
         "books.asdf.foo",
         "Unknown table or column: asdf"
     ),
+    ErrorInstance(
+        "attempt to join two existing tables that don't join",
+        "authors.series",
+        "No known join of series to authors"
+    ),
 ]
 
 def run_test(instance):
