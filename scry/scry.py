@@ -252,6 +252,26 @@ class findAliases(lark.Transformer):
                 updated_one = True
             children_with_aliases = next_round
 
+    def condition(self, children):
+        # The prefix is basically a query.
+        return children[0][0]
+
+
+    def condition_full_path(self, children):
+        return (children[0], [], children[1])
+
+    def condition_path(self, children):
+        prefix = children[0]
+        suffix, column = children[1]
+        return (prefix, suffix, column)
+
+    def condition_path_prefix(self, children):
+        return children
+
+    def condition_path_suffix(self, children):
+        return (children[:-1], children[-1])
+
+
     def component(self, children):
         return children[0]
 
@@ -299,7 +319,6 @@ class buildTree(lark.Transformer):
         # Otherwise just look up the table.
         if table not in self.aliases:
             raise ScryException(f"Table {table} not found in aliases.  Uh oh.")
-        return
 
         alias = tree.children[0].value
         schema, path, table = aliases[alias]
@@ -415,20 +434,13 @@ class buildTree(lark.Transformer):
         target["columns"] += columns
 
     def condition(self, children):
-        raise ScryException("unimplemented")
-        if tree.children[0].data == "condition_path":
-            prefix, suffix = tree.children[0].children
-            schema, prefix_tables, _, _ = self._split_path(prefix)
-            _, suffix_tables, [column], _ = self._split_path(suffix)
-        else: # full_path
-            prefix, suffix = tree.children[0].children
-            schema, prefix_tables, _, _ = self._split_path(prefix)
-            column = suffix.children[0].value
+        prefix, suffix, column = children[0]
+        op = children[1]
+        value = children[2].value
 
-            suffix_tables = []
+        if prefix[0] in self.schemas:
+            prefix = prefix[1:]
 
-        op = tree.children[1].children[0].value
-        value = tree.children[2].value
         if value[0] == '"' and value[-1] == '"':
             value = f"'{value[1:-1]}'"
 
@@ -442,26 +454,23 @@ class buildTree(lark.Transformer):
             tree["children"][alias]["table"] = table
             addConstraint(tree["children"][alias], rsuffix)
 
+        prefix_tail = prefix[-1]
+        schema, path, table = self.aliases[prefix_tail]
 
-        # If the table's already in the tree, merge it in there instead of
-        # starting a new tree.
-        first_name = prefix.children[0].children[0].value
-        if not schema and prefix.children and first_name in self.table_to_node:
-            query_root = self.table_to_node[first_name]
+        ensure_exists(self.trees, schema, {})
+        query_root = self.trees[schema]
+        prefix_node = self._find_prefix(query_root, prefix)
+
+
+        if suffix == []:
+            ensure_exists(prefix_node, "conditions", "conditions", [])
+            prefix_node["conditions"]["conditions"].append((column, op, value))
         else:
-            ensure_exists(self.trees, schema, {})
-            query_root = self.trees[schema]
-
-        prefixNode = self._find_prefix(query_root, prefix_tables)
-
-        if suffix_tables == []:
-            ensure_exists(prefixNode, "conditions", "conditions", [])
-            prefixNode["conditions"]["conditions"].append((column, op, value))
-        else:
-            (t, a), *ts = suffix_tables
-            ensure_exists(prefixNode, "conditions", "children", a, {})
-            prefixNode["conditions"]["children"][a]["table"] = t
-            addConstraint(prefixNode["conditions"]["children"][a], ts)
+            a, *ts = suffix
+            ensure_exists(prefix_node, "conditions", "children", a, {})
+            _, _, t = self.aliases[a]
+            prefix_node["conditions"]["children"][a]["table"] = t
+            addConstraint(prefix_node["conditions"]["children"][a], ts)
 
     def path_elem(self, children):
         # No alias; use the table name
@@ -477,6 +486,27 @@ class buildTree(lark.Transformer):
 
     def terminator(self, children):
         return []
+
+    def condition_full_path(self, children):
+        return (children[0], [], children[1])
+
+    def condition_path(self, children):
+        prefix = children[0]
+        suffix, column = children[1]
+        return (prefix, suffix, column)
+
+    def condition_path_prefix(self, children):
+        return children
+
+    def condition_path_suffix(self, children):
+        return (children[:-1], children[-1])
+
+    def comparison_op(self, children):
+        return children[0].value
+
+    def column(self, children):
+        return children[0].value
+
 
 def parse_set(tree):
     if tree.children[0].data != "set":
@@ -893,9 +923,14 @@ def main():
     read_rcfile(settings, cur, table_info, keys, args.limit)
 
     if args.command:
-        output = run_command(settings, cur, table_info, keys, args.command, args.limit)
-        if output is not None:
-            print("\n".join(output))
+        try:
+            output = run_command(settings, cur, table_info, keys, args.command, args.limit)
+            if output is not None:
+                print("\n".join(output))
+        except ScryException as e:
+            print(e)
+#        except lark.exceptions.LarkError as e:
+#            print(e)
     else:
         repl(settings, cur, table_info, keys)
 
