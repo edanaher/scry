@@ -403,7 +403,7 @@ class buildTree(lark.Transformer):
             else:
                 # Assume it's a table
                 if name not in self.table_columns:
-                    raise ScryException("Unknown table or column: " + name)
+                    raise ScryException(f"Unknown table or column: " + name)
                 if schema not in self.foreign_keys.get(tables[-1][0], {}).get(schema, {}).get(name, {}):
                     raise ScryException(f"No known join: {tables[-1][0]} to {name}")
                 (schema, table, alias) = self._table_alias(schema, children[-1])

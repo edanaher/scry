@@ -298,6 +298,15 @@ test_instances = [
         {'scry': {((None,), (None,)): {'books': {((None,), (('id', 6),)): {'authors': {((('name', 'Ted Chiang'),), (('id', 3),)): {}}}}}}},
         ['- scry.books.authors.name: Ted Chiang']
         ),
+   Instance(
+        'alias used before declaration',
+        'b.year books@b.title',
+        {'scry': {'children': {'b': {'table': 'books', 'columns': ['year', 'title']}}}},
+        {'selects': [('b.year', 'scry.b.year'), ('b.title', 'scry.b.title')], 'joins': ['scry.books AS b'], 'wheres': [], 'uniques': [('b.id', 'scry.b.id')]},
+        'SELECT b.id, b.year, b.title FROM scry.books AS b  LIMIT 100',
+        {'scry': {((None,), (None,)): {'b': {((('year', 1954), ('title', 'Fellowship of the Rings')), (('id', 1),)): {}, ((('year', 1954), ('title', 'The Two Towers')), (('id', 2),)): {}, ((('year', 1955), ('title', 'Return of the King')), (('id', 3),)): {}, ((('year', 1997), ('title', "Harry Potter and the Philosopher's Stone")), (('id', 4),)): {}, ((('year', 1999), ('title', 'Harry Potter and the Prisoner of Azkaban')), (('id', 5),)): {}, ((('year', 2019), ('title', 'Exhalation')), (('id', 6),)): {}, ((('year', 2016), ('title', 'Beowolf')), (('id', 7),)): {}}}}},
+        ['- scry.b.year: 1954', '  scry.b.title: Fellowship of the Rings', '- scry.b.year: 1954', '  scry.b.title: The Two Towers', '- scry.b.year: 1955', '  scry.b.title: Return of the King', '- scry.b.year: 1997', "  scry.b.title: Harry Potter and the Philosopher's Stone", '- scry.b.year: 1999', '  scry.b.title: Harry Potter and the Prisoner of Azkaban', '- scry.b.year: 2019', '  scry.b.title: Exhalation', '- scry.b.year: 2016', '  scry.b.title: Beowolf']
+        ),
     # End of instances
 ]
 
