@@ -16,7 +16,18 @@ error_instances = [
         "Misnamed column on inner table",
         "books.authors.nam",
         "Unknown table or column: nam"
-    )
+    ),
+    # TODO: this one could be better.
+    ErrorInstance(
+        "Single unknown word",
+        "asdf",
+        "Unable to resolve schema for asdf"
+    ),
+    ErrorInstance(
+        "Unknown middle table in chain",
+        "books.asdf.foo",
+        "Unknown table or column: asdf"
+    ),
 ]
 
 def run_test(instance):
