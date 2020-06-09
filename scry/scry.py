@@ -917,6 +917,7 @@ class ScryCompleter(Completer):
                 prev_part = aliases[None][prev_part][2]
             column_candidates = self.table_columns.get(prev_part, [])
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
+            schema_candidates = [t for t, ss in self.tables.items() if prev_part in ss]
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
         else:
             schema_candidates += self.schemas
