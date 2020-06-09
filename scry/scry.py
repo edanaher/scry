@@ -904,7 +904,8 @@ class ScryCompleter(Completer):
         if word == ".":
             word = ""
 
-        table_candidates = list(self.tables.keys())
+        schemas = set(self.settings["config"]["search_path"].split(","))
+        table_candidates = [t for t, ss in self.tables.items() if len(set(ss) & schemas) > 0]
 
         component = doc.get_word_before_cursor("\\S*")
         column_candidates = []
