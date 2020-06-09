@@ -203,7 +203,6 @@ Currently, the tests are pretty much generated, and require the database to be s
 - path finding (table1..table3, find join via table.table2.table3)
 - defined connection strings
 - list tables in schema
-- Fuller tab completion in REPL (schemas)
 - schema aliases
 - generally squash the bugs and clean some things up.
 - make tests easier to run.
@@ -211,3 +210,4 @@ Currently, the tests are pretty much generated, and require the database to be s
 - other output formats (psql-style table, list of fields)
 - column aliases (for output)
 - handle cross-schema joins
+- test tab completion
