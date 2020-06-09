@@ -910,6 +910,7 @@ class ScryCompleter(Completer):
         component = doc.get_word_before_cursor("\\S*")
         column_candidates = []
         parts = component.split(".")
+        schema_candidates = []
         if len(parts) > 1:
             prev_part = parts[-2]
             if prev_part in aliases:
@@ -918,10 +919,10 @@ class ScryCompleter(Completer):
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
             table_candidates = [t for joins in table_dicts for t in joins.keys()]
         else:
+            schema_candidates += self.schemas
             table_candidates += aliases.get(None, [])
 
-
-        candidates = sorted(column_candidates) + sorted(list(set(table_candidates)))
+        candidates = sorted(column_candidates) + sorted(list(set(table_candidates))) + sorted(schema_candidates)
         matches = [c for c in candidates if c.startswith(word)]
         return [Completion(c, -len(word)) for c in matches]
 
