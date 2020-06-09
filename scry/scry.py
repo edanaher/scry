@@ -590,7 +590,7 @@ def parse(settings, table_info, foreign_keys, query, aliases_only=False):
         COMPONENT: NAME
         COLUMN: NAME | "*"
         VALUE: ESCAPED_STRING | SIGNED_NUMBER | "NULL"
-        SETTING: NAME | SIGNED_NUMBER
+        SETTING: /\S+/
 
         %import common.CNAME -> NAME
         %import common.ESCAPED_STRING
