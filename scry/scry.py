@@ -551,6 +551,8 @@ def parse_set(tree):
     if tree.children[0].data != "set":
         return None
     property = tree.children[0].children[0].value
+    if len(tree.children[0].children) == 1:
+        return (property,)
     value = tree.children[0].children[1].value
     return (property, value)
 
@@ -566,7 +568,7 @@ def parse(settings, table_info, foreign_keys, query, aliases_only=False):
     p = Lark(r"""
         start: query | set | alias
 
-        set: "\\set" NAME SETTING
+        set: "\\set" NAME SETTING?
         alias: "\\alias" NAME "@"? NAME
 
         query: component (WS+ component)*
@@ -815,15 +817,20 @@ def format_results(results, path="", indent=""):
 
     return output
 
-def run_setting(settings, key, value):
-    print("Setting", key, "=", value)
+def run_setting(settings, setting):
+    if len(setting) == 1:
+        print(f"{setting[0]} is {settings['config'].get(setting[0], 'unset')}")
+        return
+
+    key, value = setting
+    print("Setting", key, "to", value)
     settings["config"][key] = value
 
 
 def run_command(settings, cur, table_info, keys, query):
     tree, aliases, setting, alias = parse(settings, table_info, keys["foreign"], query)
     if setting:
-        run_setting(settings, *setting)
+        run_setting(settings, setting)
         return
 
     if alias:
