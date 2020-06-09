@@ -197,12 +197,11 @@ TODO
 Currently, the tests are pretty much generated, and require the database to be set up just right.  There's a TODO to fix this.
 
 ## TODO:
-- use of aliases before declaration(?): "b.authors.name books@b.title"
 - aggregations
 - proper schema inference (cross-schema joins: track all possible schemas)
   - search\_path to limit 
 - path finding (table1..table3, find join via table.table2.table3)
-- config file - connection strings, aliases
+- defined connection strings
 - list tables in schema
 - Fuller tab completion in REPL (schemas)
 - schema aliases
