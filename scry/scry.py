@@ -26,7 +26,8 @@ def default_settings():
     return {
         "config": {
             "complete_style": "column",
-            "search_path": "scry,public,information_schema"
+            "search_path": "scry,public,information_schema",
+            "limit": 100,
         },
         "aliases": {},
     }
@@ -734,7 +735,7 @@ def parseargs():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--command", help="command to run")
     parser.add_argument("-d", "--database", help="database to connect to")
-    parser.add_argument("-l", "--limit", help="row limit (0 for no limit)", default=100, type=int)
+    parser.add_argument("-l", "--limit", help="row limit (0 for no limit)", type=int)
     parser.add_argument("-s", "--schema", help="default schema", default="scry")
     return parser.parse_args()
 
@@ -819,7 +820,7 @@ def run_setting(settings, key, value):
     settings["config"][key] = value
 
 
-def run_command(settings, cur, table_info, keys, query, limit=100):
+def run_command(settings, cur, table_info, keys, query):
     tree, aliases, setting, alias = parse(settings, table_info, keys["foreign"], query)
     if setting:
         run_setting(settings, *setting)
@@ -837,7 +838,7 @@ def run_command(settings, cur, table_info, keys, query, limit=100):
     sql_clauses = generate_sql(keys, tree)
 
     uniques = sql_clauses["uniques"]
-    sql = serialize_sql(sql_clauses, limit)
+    sql = serialize_sql(sql_clauses, settings["config"]["limit"])
 
     print(sql)
     cur.execute(sql)
@@ -871,7 +872,7 @@ class ScryCompleter(Completer):
                 candidates = ["\\set", "\\alias"]
             if words[0] == "\\set":
                 if len(words) == 2:
-                    candidates = ["complete_style"]
+                    candidates = ["complete_style", "search_path", "limit"]
                 if len(words) == 3 and words[1] == "complete_style":
                     candidates = completion_styles.keys()
             if words[0] == "\\alias":
@@ -938,11 +939,11 @@ def repl(settings, cur, table_info, keys):
     except EOFError:
         pass
 
-def read_rcfile(settings, cur, table_info, keys, limit):
+def read_rcfile(settings, cur, table_info, keys):
     try:
         with open(os.getenv("HOME") + "/.scry/scryrc") as rcfile:
             for line in rcfile.readlines():
-                run_command(settings, cur, table_info, keys, line, limit)
+                run_command(settings, cur, table_info, keys, line)
     except FileNotFoundError:
         pass
 
@@ -958,11 +959,15 @@ def main():
     unique_keys = get_unique_keys(cur)
     keys = { "unique": unique_keys, "foreign": foreign_keys }
 
-    read_rcfile(settings, cur, table_info, keys, args.limit)
+    read_rcfile(settings, cur, table_info, keys)
+
+    if args.limit:
+        settings["config"]["limit"] = int(args.limit)
+
 
     if args.command:
         try:
-            output = run_command(settings, cur, table_info, keys, args.command, args.limit)
+            output = run_command(settings, cur, table_info, keys, args.command)
             if output is not None:
                 print("\n".join(output))
         except ScryException as e:

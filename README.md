@@ -211,5 +211,4 @@ Currently, the tests are pretty much generated, and require the database to be s
 - sorting
 - other output formats (psql-style table, list of fields)
 - column aliases (for output)
-- put limit in settings (\set limit 100)
 - handle cross-schema joins
