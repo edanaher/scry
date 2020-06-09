@@ -913,7 +913,7 @@ class ScryCompleter(Completer):
         schema_candidates = []
         if len(parts) > 1:
             prev_part = parts[-2]
-            if prev_part in aliases:
+            if prev_part in aliases[None]:
                 prev_part = aliases[None][prev_part][2]
             column_candidates = self.table_columns.get(prev_part, [])
             table_dicts = self.foreign_keys.get(prev_part, {}).values()
